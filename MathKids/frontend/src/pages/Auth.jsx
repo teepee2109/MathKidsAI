@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { saveAuthSession } from "../authStorage";
 import "./Auth.css";
 
 const initialValues = {
@@ -156,14 +157,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 );
             }
 
-            // Lưu JWT token
-            localStorage.setItem("token", data.token);
-
-            // Lưu thông tin user
-            localStorage.setItem(
-                "user",
-                JSON.stringify(data.user)
-            );
+            // Persist login only when the user selected "remember me".
+            saveAuthSession(data, isRegister || remember);
 
             // Đăng nhập / đăng ký thành công
             onAuthenticated?.();
@@ -263,6 +258,10 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             <section className="auth-panel">
 
                 <div className="auth-form-wrap">
+
+                    <Link className="auth-home-link" to="/">
+                        ← Về trang chủ
+                    </Link>
 
                     <Link
                         className="mobile-brand"

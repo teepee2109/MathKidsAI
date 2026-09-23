@@ -29,5 +29,7 @@ Trong môi trường dev, Vite tự proxy `/api` sang backend ở port `4000`, v
 - `POST /api/auth/login` — body `{ email, password }`.
 - `GET /api/auth/me` — cần header `Authorization: Bearer <token>`.
 - `GET /api/students/me/dashboard` — hồ sơ, lớp, XP, sao, số bài học và bài đánh giá; cần JWT.
+- `GET /api/students/me/profile` — tải hồ sơ học sinh; cần JWT.
+- `PATCH /api/students/me/profile` — cập nhật tên, email, ngày sinh, lớp, URL ảnh đại diện; cần JWT.
 
 Nếu dùng named instance, SQL Server Browser hoặc TCP/IP phải được bật. Nếu instance dùng port cố định, đặt port đó trong `DB_PORT` và có thể bỏ `DB_INSTANCE`.

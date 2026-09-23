@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import "./StudentDashboard.css";
+import "./StudentDashboardHeader.css";
 
 const learningCards = [
   { icon: "➕", title: "Phép cộng vui", detail: "Luyện tập phép cộng", color: "coral", href: "#lessons" },
@@ -9,16 +11,15 @@ const learningCards = [
 ];
 
 export default function StudentDashboard({ onLogout }) {
-  const [student, setStudent] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
-  });
+  const [student, setStudent] = useState(getCachedUser);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadDashboard = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/students/me/dashboard`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
@@ -27,7 +28,8 @@ export default function StudentDashboard({ onLogout }) {
       }
       if (!response.ok) throw new Error(data.message || data.detail || "Không thể tải dữ liệu học sinh.");
       setStudent(data.student);
-      localStorage.setItem("user", JSON.stringify(data.student));
+      setAvatarBroken(false);
+      saveCachedUser(data.student);
     } catch (loadError) {
       setError(loadError.message || "Không thể kết nối tới máy chủ.");
     } finally {
@@ -50,7 +52,7 @@ export default function StudentDashboard({ onLogout }) {
     <header className="dashboard-header">
       <Link className="dashboard-brand" to="/dashboard"><span>★</span> Math<span>Kids</span></Link>
       <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard">⌂ <span>Tổng quan</span></a><a href="#lessons">▣ <span>Bài học</span></a><a href="#challenge">♜ <span>Thử thách</span></a></nav>
-      <div className="dashboard-account"><span className="dashboard-avatar">{student?.avatarUrl ? <img src={student.avatarUrl} alt="" /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span><button onClick={onLogout}>Đăng xuất</button></div>
+      <div className="dashboard-account"><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className="dashboard-avatar">{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span></Link><button onClick={onLogout}>Đăng xuất</button></div>
     </header>
 
     <div className="dashboard-content" id="dashboard">
