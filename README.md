@@ -61,15 +61,7 @@ Có thể:
 -   Nhận cảnh báo học tập.
 -   Xem gợi ý hỗ trợ do hệ thống/AI tạo ra.
 
-## 2.3. Teacher
-
-Tài liệu dự án có đề cập đến việc hỗ trợ giáo viên và hợp tác với trung
-tâm/giáo viên, nhưng chưa đặc tả đầy đủ các chức năng của Teacher.
-
-Do đó, các chức năng Teacher chi tiết cần được nhóm xác nhận trước khi
-triển khai.
-
-## 2.4. Admin
+## 2.3. Admin
 
 Admin là vai trò cần thiết nếu triển khai website hoàn chỉnh, nhưng tài
 liệu dự án hiện chưa đặc tả chi tiết nghiệp vụ Admin.
