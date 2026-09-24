@@ -386,3 +386,23 @@ export function authenticate(
             });
     }
 }
+
+export async function requireAdmin(request, response, next) {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("userId", sql.Int, request.user.userId)
+            .query("SELECT UserRole, IsActive FROM [mk].[AppUser] WHERE UserId = @userId");
+        const currentUser = result.recordset[0];
+        if (!currentUser || !currentUser.IsActive) {
+            return response.status(401).json({ message: "Tài khoản không còn hoạt động." });
+        }
+        if (currentUser.UserRole !== "Admin") {
+            return response.status(403).json({ message: "Bạn không có quyền truy cập chức năng quản trị." });
+        }
+        request.user.role = currentUser.UserRole;
+        return next();
+    } catch (error) {
+        return response.status(500).json({ message: "Không thể xác thực quyền quản trị.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+    }
+}

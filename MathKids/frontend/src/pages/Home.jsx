@@ -20,6 +20,14 @@ function HeroArt() {
   </div>;
 }
 
+function NotificationBell({ isAuthenticated }) {
+  const [open, setOpen] = useState(false);
+  return <div className="notification-wrap">
+    <button className="notification-button" aria-label="Mở thông báo" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>🔔</span><b>1</b></button>
+    {open && <div className="notification-panel"><div className="notification-heading"><strong>Thông báo</strong><small>1 mới</small></div><div className="notification-item"><span>🎉</span><div><strong>Chào mừng đến MathKids!</strong><p>{isAuthenticated ? "Hãy tiếp tục hành trình học toán của bạn." : "Đăng nhập để nhận gợi ý học tập riêng cho bạn."}</p></div></div>{!isAuthenticated && <Link to="/dang-nhap" className="notification-action">Đăng nhập để xem thêm →</Link>}</div>}
+  </div>;
+}
+
 function Home({ isAuthenticated = false, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return <main className="home" id="top">
@@ -27,6 +35,7 @@ function Home({ isAuthenticated = false, onLogout }) {
       <a className="brand" href="#top"><span className="brand-star">★</span><span>Math<span>Kids</span></span></a>
       <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Mở menu">☰</button>
       <nav className={menuOpen ? "nav-links open" : "nav-links"}>{navItems.map(([icon, label, href], index) => <a className={index === 0 ? "active" : ""} href={href} key={label}><i>{icon}</i>{label}</a>)}</nav>
+      <NotificationBell isAuthenticated={isAuthenticated} />
       {isAuthenticated ? <div className="profile"><span className="avatar">👦</span><span>Học sinh</span><b>⌄</b><button onClick={onLogout}>⇥ &nbsp;Đăng xuất</button></div> : <div className="auth-actions"><Link className="login-link" to="/dang-nhap">Đăng nhập</Link><Link className="register-link" to="/dang-ky">Đăng ký</Link></div>}
     </header>
     <section className="hero">

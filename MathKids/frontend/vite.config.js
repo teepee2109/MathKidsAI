@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    allowedHosts: ['fantasize-riverbank-backup.ngrok-free.dev'],
     proxy: {
       '/api': 'http://localhost:4000',
       '/uploads': 'http://localhost:4000',

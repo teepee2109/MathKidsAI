@@ -161,8 +161,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             saveAuthSession(data, isRegister || remember);
 
             // Đăng nhập / đăng ký thành công
-            onAuthenticated?.();
-            navigate("/dashboard");
+            onAuthenticated?.(data.user);
+            navigate(data.user.role === "Admin" ? "/admin/dashboard" : "/dashboard");
 
         } catch (error) {
             console.error("Auth error:", error);
