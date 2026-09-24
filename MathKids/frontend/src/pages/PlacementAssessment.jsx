@@ -1,27 +1,36 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getAuthToken, getCachedUser } from "../authStorage";
+import { apiUrl } from "../api";
 import "./PlacementAssessment.css";
 
-const api = `${import.meta.env.VITE_API_URL || "/api"}/students/me`;
-const paymentsApi = `${import.meta.env.VITE_API_URL || "/api"}/payments`;
 const assessmentContentEnabled = true;
 
 async function request(path, options = {}) {
-  const response = await fetch(`${api}${path}`, {
-    ...options,
-    headers: { Authorization: `Bearer ${getAuthToken()}`, "Content-Type": "application/json", ...options.headers },
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "Không thể kết nối máy chủ.");
-  return data;
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(apiUrl(`students/me${path}`), {
+        ...options,
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${getAuthToken()}`, "Content-Type": "application/json", ...options.headers },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể kết nối máy chủ.");
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 350));
+    }
+  }
+  throw lastError;
 }
 
 async function paymentRequest(path) {
   let lastError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetch(`${paymentsApi}${path}`, { cache: "no-store", headers: { Authorization: `Bearer ${getAuthToken()}` } });
+      const response = await fetch(apiUrl(`payments${path}`), { cache: "no-store", headers: { Authorization: `Bearer ${getAuthToken()}` } });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "Không thể tải trạng thái Premium.");
       return data;
@@ -70,16 +79,21 @@ export default function PlacementAssessment() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([request("/dashboard"), request("/assessment/latest"), request("/assessment/history")])
-      .then(async ([dashboard, latest, historyData]) => {
+    Promise.allSettled([request("/dashboard"), request("/assessment/latest"), request("/assessment/history")])
+      .then(async ([dashboardResult, latestResult, historyResult]) => {
         if (!active) return;
-        setGrade(Number(dashboard.student.grade) || 1);
-        setResult(latest.result);
-        setHistory(historyData.history || []);
+        if (dashboardResult.status === "fulfilled") setGrade(Number(dashboardResult.value.student.grade) || 1);
+        else setError(dashboardResult.reason?.message || "Không tải được hồ sơ học sinh.");
+        if (latestResult.status === "fulfilled") setResult(latestResult.value.result);
+        if (historyResult.status === "fulfilled") setHistory(historyResult.value.history || []);
+        const assessmentErrors = [latestResult, historyResult]
+          .filter((item) => item.status === "rejected")
+          .map((item) => item.reason?.message)
+          .filter(Boolean);
+        if (assessmentErrors.length) setError((current) => [current, ...assessmentErrors].filter(Boolean).join(" "));
         const premium = await paymentRequest("/premium/status").catch(() => null);
         if (active) setIsPremium(Boolean(premium?.isPremium ?? getCachedUser()?.isPremium));
       })
-      .catch((loadError) => { if (active) setError(loadError.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);

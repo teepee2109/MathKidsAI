@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
+import { apiUrl } from "../api";
 import "./StudentDashboard.css";
 import "./StudentDashboardHeader.css";
 import "./StudentAssessmentInvite.css";
@@ -37,8 +38,8 @@ export default function StudentDashboard({ onLogout }) {
     try {
       const headers = { Authorization: `Bearer ${getAuthToken()}` };
       const [response, premiumResponse] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL || "/api"}/students/me/dashboard`, { headers }),
-        fetch(`${import.meta.env.VITE_API_URL || "/api"}/payments/premium/status`, { cache: "no-store", headers }),
+        fetch(apiUrl("students/me/dashboard"), { cache: "no-store", headers }),
+        fetch(apiUrl("payments/premium/status"), { cache: "no-store", headers }),
       ]);
       const data = await response.json().catch(() => ({}));
       const premiumData = await premiumResponse.json().catch(() => ({}));
@@ -69,6 +70,52 @@ export default function StudentDashboard({ onLogout }) {
   useEffect(() => {
     const timer = window.setTimeout(() => loadDashboard(), 0);
     return () => window.clearTimeout(timer);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (student?.isPremium) return undefined;
+    let active = true;
+    const refreshPremium = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await fetch(apiUrl("payments/premium/status"), {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!active) return;
+        const nextPremium = Boolean(data.isPremium);
+        const expiresAt = data.subscription?.expiresAt || "";
+        setStudent((current) => {
+          const next = { ...(current || getCachedUser() || {}), isPremium: nextPremium, premiumExpiresAt: expiresAt };
+          saveCachedUser(next);
+          return next;
+        });
+      } catch {
+        // Keep the current dashboard state and retry on the next interval.
+      }
+    };
+    const interval = window.setInterval(refreshPremium, 4000);
+    const onVisible = () => refreshPremium();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [student?.isPremium]);
+
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") loadDashboard();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
   }, [loadDashboard]);
 
   function retryDashboard() {

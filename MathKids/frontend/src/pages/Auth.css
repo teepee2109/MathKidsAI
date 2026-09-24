@@ -27,3 +27,4 @@
 .submit-button:disabled { cursor: wait; opacity: .7; transform: none; }
 .auth-home-link { display: inline-flex; align-items: center; margin-bottom: 22px; color: #6d7f98; font-size: 13px; font-weight: 800; text-decoration: none; }
 .auth-home-link:hover { color: var(--purple); }
+.google-button-host{height:44px;overflow:hidden;padding:0;background:#fff}.google-button-host>div{width:100%!important}.google-button:disabled{cursor:wait;opacity:.7}

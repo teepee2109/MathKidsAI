@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getAuthToken } from "../authStorage";
+import { getAuthToken, getCachedUser, saveCachedUser } from "../authStorage";
 import "./PaymentResult.css";
 
 export default function PaymentResult() {
@@ -20,6 +20,16 @@ export default function PaymentResult() {
       const data = await response.json().catch(() => ({}));
       if (!active) return;
       setPayment(data.payment || null);
+      if (data.payment?.status === "Paid") {
+        const cachedUser = getCachedUser();
+        if (cachedUser) {
+          saveCachedUser({
+            ...cachedUser,
+            isPremium: true,
+            premiumExpiresAt: data.payment.expiresAt || cachedUser.premiumExpiresAt || "",
+          });
+        }
+      }
       setLoading(false);
       if (status === "success" && data.payment?.status === "Pending" && attempts < 15) {
         attempts += 1;

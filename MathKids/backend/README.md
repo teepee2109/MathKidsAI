@@ -22,11 +22,26 @@ npm run dev
 
 Trong môi trường dev, Vite tự proxy `/api` sang backend ở port `4000`, vì vậy cần chạy cả hai process.
 
+## Google Sign-In
+
+Tạo OAuth Client ID loại **Web application** trong Google Cloud Console và thêm `http://localhost:5173` vào `Authorized JavaScript origins`. Cấu hình cùng Client ID ở hai file:
+
+```env
+# backend/.env
+GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
+
+# frontend/.env
+VITE_GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
+```
+
+Backend xác thực ID token với Google, kiểm tra audience, issuer và email đã xác minh. Người dùng Google mới được tạo tài khoản Student cùng hồ sơ lớp 1; email đã tồn tại sẽ đăng nhập vào tài khoản hiện có.
+
 ## API xác thực
 
 - `GET /api/health` — kiểm tra kết nối SQL Server.
 - `POST /api/auth/register` — body `{ name, email, password, confirmPassword }`.
 - `POST /api/auth/login` — body `{ email, password }`.
+- `POST /api/auth/google` — body `{ credential }` từ Google Identity Services.
 - `GET /api/auth/me` — cần header `Authorization: Bearer <token>`.
 - `GET /api/students/me/dashboard` — hồ sơ, lớp, XP, sao, số bài học và bài đánh giá; cần JWT.
 - `GET /api/students/me/profile` — tải hồ sơ học sinh; cần JWT.

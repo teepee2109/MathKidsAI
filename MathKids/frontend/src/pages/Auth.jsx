@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAuthSession } from "../authStorage";
 import "./Auth.css";
@@ -11,6 +11,12 @@ const initialValues = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const configuredGoogleClientId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
+const googleClientId = /^\d+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(configuredGoogleClientId)
+    ? configuredGoogleClientId
+    : "";
+const configuredApiBase = String(import.meta.env.VITE_API_URL || "/api").trim().replace(/\/+$/, "");
+const apiBase = configuredApiBase.endsWith("/api") ? configuredApiBase : `${configuredApiBase}/api`;
 
 export default function Auth({ initialMode = "login", onAuthenticated }) {
     const navigate = useNavigate();
@@ -22,8 +28,62 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const [error, setError] = useState("");
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [googleReady, setGoogleReady] = useState(false);
+    const googleButtonRef = useRef(null);
 
     const isRegister = mode === "register";
+
+    const handleGoogleCredential = useCallback(async (credential) => {
+        setIsSubmitting(true);
+        setError("");
+        try {
+            const response = await fetch(`${apiBase}/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credential }) });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || "Đăng nhập Google thất bại.");
+            saveAuthSession(data, true);
+            onAuthenticated?.(data.user);
+            navigate(data.user.role === "Admin" ? "/admin/dashboard" : "/dashboard");
+        } catch (googleError) {
+            setError(googleError.message || "Đăng nhập Google thất bại.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    }, [navigate, onAuthenticated]);
+
+    useEffect(() => {
+        if (!googleClientId) return undefined;
+        const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+        const script = existingScript || document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        const onReady = () => setGoogleReady(Boolean(window.google?.accounts?.id));
+        script.addEventListener("load", onReady);
+        if (window.google?.accounts?.id) onReady();
+        if (!existingScript) document.head.appendChild(script);
+        return () => script.removeEventListener("load", onReady);
+    }, []);
+
+    useEffect(() => {
+        if (!googleReady || !googleButtonRef.current) return undefined;
+        const buttonElement = googleButtonRef.current;
+        buttonElement.innerHTML = "";
+        window.google.accounts.id.initialize({ client_id: googleClientId, callback: (response) => handleGoogleCredential(response.credential) });
+        window.google.accounts.id.renderButton(buttonElement, { type: "standard", theme: "outline", size: "large", text: "continue_with", shape: "rectangular", width: buttonElement.clientWidth || 420, logo_alignment: "left" });
+        return () => { buttonElement.innerHTML = ""; };
+    }, [googleReady, handleGoogleCredential]);
+
+    function handleGoogleLogin() {
+        if (!googleClientId) {
+            setError("Google chưa được cấu hình đúng. Hãy dùng Client ID kết thúc bằng .apps.googleusercontent.com, không dùng Client Secret bắt đầu bằng GOCSPX-.");
+            return;
+        }
+        if (!googleReady) {
+            setError("Google đang tải, vui lòng thử lại sau giây lát.");
+            return;
+        }
+        window.google.accounts.id.prompt();
+    }
 
     function switchMode(nextMode) {
         setMode(nextMode);
@@ -121,7 +181,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
         try {
             // Xác định API
-            const url = `${import.meta.env.VITE_API_URL || "/api"}/auth/${mode === "register" ? "register" : "login"}`;
+            const url = `${apiBase}/auth/${mode === "register" ? "register" : "login"}`;
 
             // Dữ liệu gửi lên Backend
             const body =
@@ -582,16 +642,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         </span>
                     </div>
 
-                    <button
-                        className="google-button"
-                        type="button"
-                    >
-                        <span className="google-icon">
-                            G
-                        </span>
-
-                        Google
-                    </button>
+                    {googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>}
 
                     {/* TERMS */}
                     <p className="terms">

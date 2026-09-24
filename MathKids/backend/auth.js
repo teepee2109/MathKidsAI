@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "node:crypto";
 import { getPool, sql } from "./db.js";
 
 const jwtSecret =
@@ -334,6 +335,57 @@ export async function loginUser({
             role: user.UserRole
         }
     };
+}
+
+export async function loginWithGoogle(credential) {
+    if (!/^\d+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(String(process.env.GOOGLE_CLIENT_ID || "").trim())) {
+        const error = new Error("Google login chưa được cấu hình đúng trên máy chủ: cần Client ID kết thúc bằng .apps.googleusercontent.com.");
+        error.status = 503;
+        throw error;
+    }
+    if (typeof credential !== "string" || credential.length < 20) {
+        const error = new Error("Thông tin xác thực Google không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    const googleResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    const googleUser = await googleResponse.json().catch(() => ({}));
+    if (!googleResponse.ok || googleUser.aud !== process.env.GOOGLE_CLIENT_ID || googleUser.iss !== "https://accounts.google.com" || googleUser.email_verified !== "true" || !googleUser.email) {
+        const error = new Error("Không thể xác thực tài khoản Google.");
+        error.status = 401;
+        throw error;
+    }
+
+    const email = googleUser.email.trim().toLowerCase();
+    const pool = await getPool();
+    const existingResult = await pool.request().input("email", sql.NVarChar(255), email).query("SELECT TOP 1 UserId, Email, DisplayName, UserRole, IsActive FROM [mk].[AppUser] WHERE Email = @email");
+    let user = existingResult.recordset[0];
+    if (user && !user.IsActive) {
+        const error = new Error("Tài khoản đã bị khóa.");
+        error.status = 403;
+        throw error;
+    }
+    if (!user) {
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        try {
+            const created = await transaction.request()
+                .input("email", sql.NVarChar(255), email)
+                .input("passwordHash", sql.NVarChar(500), await bcrypt.hash(randomUUID(), 12))
+                .input("displayName", sql.NVarChar(120), String(googleUser.name || email.split("@")[0]).slice(0, 120))
+                .query("INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName) OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole VALUES (@email, @passwordHash, @displayName)");
+            user = created.recordset[0];
+            await transaction.request().input("studentId", sql.Int, user.UserId).query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, 1)");
+            await transaction.commit();
+        } catch (error) {
+            await transaction.rollback().catch(() => {});
+            if (error.number === 2627 || error.number === 2601) {
+                const retry = await pool.request().input("email", sql.NVarChar(255), email).query("SELECT TOP 1 UserId, Email, DisplayName, UserRole, IsActive FROM [mk].[AppUser] WHERE Email = @email");
+                user = retry.recordset[0];
+            } else throw error;
+        }
+    }
+    return { token: createToken(user), user: { id: user.UserId, email: user.Email, name: user.DisplayName, role: user.UserRole } };
 }
 
 

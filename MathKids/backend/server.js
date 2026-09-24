@@ -6,7 +6,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { getPool, sql } from "./db.js";
-import { authenticate, loginUser, registerUser, requireAdmin, validateCredentials } from "./auth.js";
+import { authenticate, loginUser, loginWithGoogle, registerUser, requireAdmin, validateCredentials } from "./auth.js";
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -218,6 +218,15 @@ async function createLearningAdvice(skillScores, grade) {
 }
 app.use(cors({ origin: process.env.NODE_ENV === "production" ? (process.env.FRONTEND_ORIGIN || "http://localhost:5173") : true }));
 app.use(express.json({ limit: "7mb" }));
+
+// Keep authentication compatible with older frontend builds that used either
+// /auth/*, /api/auth/*, or accidentally duplicated the /api prefix.
+app.use((request, _response, next) => {
+  if (/^\/api\/api\//i.test(request.url)) request.url = request.url.replace(/^\/api/i, "");
+  if (/^\/auth\/(login|register|google)$/i.test(request.path)) request.url = `/api${request.url}`;
+  next();
+});
+
 app.use("/uploads", express.static(uploadsDirectory, { fallthrough: false, maxAge: "7d" }));
 
 app.get("/api/health", async (_request, response) => {
@@ -239,6 +248,11 @@ app.post("/api/auth/login", async (request, response) => {
   if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
   try { return response.json(await loginUser(body)); }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
+});
+
+app.post("/api/auth/google", async (request, response) => {
+  try { return response.json(await loginWithGoogle(request.body?.credential)); }
+  catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Google thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
 
 app.get("/api/auth/me", authenticate, async (request, response) => {
