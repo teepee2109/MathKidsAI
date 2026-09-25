@@ -206,7 +206,7 @@ CREATE TABLE [mk].[LearningPath]
     CreatedAt       DATETIME2(0) NOT NULL CONSTRAINT DF_LearningPath_CreatedAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT PK_LearningPath PRIMARY KEY (LearningPathId),
     CONSTRAINT FK_LearningPath_Student FOREIGN KEY (StudentId) REFERENCES [mk].[Student](StudentId),
-    CONSTRAINT CK_LearningPath_GeneratedBy CHECK (GeneratedBy IN ('System','AI','Teacher','Parent')),
+    CONSTRAINT CK_LearningPath_GeneratedBy CHECK (GeneratedBy IN ('System','AI','ChatGPT','Gemini','Fallback','Teacher','Parent')),
     CONSTRAINT CK_LearningPath_Status CHECK (Status IN ('Draft','Active','Completed','Archived')),
     CONSTRAINT CK_LearningPath_Dates CHECK (EndDate IS NULL OR EndDate >= StartDate)
 );

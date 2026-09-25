@@ -1,0 +1,16 @@
+.daily-question-state{display:grid;gap:10px;justify-items:center;padding:20px 12px;color:#71849d;text-align:center;font-size:13px}
+.daily-question-state button{padding:7px 12px;border:1px solid #d9e6f5;border-radius:8px;background:#fff;color:#3275ca;font-weight:800;cursor:pointer}
+.daily-question div .daily-answer{flex:1;min-width:0;padding:8px 4px;border:1px solid #e1eaf4;border-radius:9px;background:#fff;color:#426188;text-align:center;font-size:13px;font-weight:900;cursor:pointer}
+.daily-question div .daily-answer:hover:not(:disabled),.daily-question div .daily-answer.is-selected{border-color:#eaae38;background:#fff5d8;color:#8b5c03}
+.daily-question div .daily-answer:disabled{cursor:default;opacity:.8}
+.daily-panel>button:disabled{cursor:default;opacity:.65}
+.daily-feedback{margin:9px 0 0!important;color:#a56908!important;font-size:12px!important;font-weight:800}
+.daily-feedback.is-success{color:#168d58!important}
+.daily-feedback.is-error{color:#c43838!important}
+.daily-reward-note{display:block;margin-top:8px;color:#8998aa;text-align:center;font-size:10px}
+.daily-countdown{display:flex;align-items:center;justify-content:space-between;margin:-2px 0 8px;padding:6px 9px;border-radius:9px;background:#fff8e7;color:#9a6a16;font-size:11px;font-weight:800}
+.daily-countdown strong{font-variant-numeric:tabular-nums;font-size:16px;color:#a86e08}
+.daily-countdown.is-urgent{background:#fff0ed;color:#bd3a32;animation:daily-timer-pulse 1s ease-in-out infinite alternate}
+.daily-countdown.is-urgent strong{color:#bd3a32}
+.daily-challenge-number{display:block;margin-bottom:2px;color:#94a2b4;text-align:center;font-size:10px;font-weight:800}
+@keyframes daily-timer-pulse{to{box-shadow:0 0 0 3px #e84b3b18}}

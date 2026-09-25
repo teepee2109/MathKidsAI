@@ -1,0 +1,12 @@
+.brand-logo-icon{position:relative;display:inline-block;width:44px;height:44px;flex:0 0 44px;overflow:hidden;border:1px solid #e5efff;border-radius:14px;background:#eaf5ff;vertical-align:middle}
+.brand-logo-icon img{position:absolute;top:-5%;left:-25%;width:150%;height:150%;max-width:none;object-fit:cover}
+.brand-logo-name{color:#1e58ad;white-space:nowrap}
+.brand-logo-name span{color:#22a864}
+.dashboard-brand>.brand-logo-icon,.admin-brand>.brand-logo-icon{color:inherit;font-size:0}
+.dashboard-brand>span.brand-logo-name,.admin-brand>span.brand-logo-name{color:#1e58ad}
+.dashboard-brand>span.brand-logo-name>span,.admin-brand>span.brand-logo-name>span{color:#22a864}
+.brand>.brand-logo-name{color:#1e58ad}
+.brand>.brand-logo-name span{color:#23ad69}
+.mobile-brand .brand-logo-icon{width:34px;height:34px;flex-basis:34px;border-radius:11px;background:#eaf5ff}
+.mobile-brand>span.brand-logo-name{display:inline-block;width:auto;height:auto;color:#7a61e8;background:transparent;font:inherit}
+.mobile-brand>span.brand-logo-name>span{display:inline;width:auto;height:auto;color:#22a864;background:transparent;font:inherit}

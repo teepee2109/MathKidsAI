@@ -1,0 +1,65 @@
+.monthly-page{min-height:100vh;background:#f3f8ff;color:#234b7b;font-family:'Nunito',sans-serif}
+.monthly-header{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(20px,6vw,88px);background:#fff;box-shadow:0 3px 14px #1b46700b}
+.monthly-header>a:last-child{color:#3979c7;font-size:13px;font-weight:900;text-decoration:none}
+.monthly-content{width:min(920px,92%);margin:0 auto;padding:30px 0 50px}
+.monthly-heading-card,.monthly-panel,.monthly-history{border:1px solid #e6edf6;border-radius:21px;background:#fff;box-shadow:0 10px 24px #244e7609}
+.monthly-heading-card{position:relative;display:flex;align-items:center;justify-content:space-between;min-height:145px;margin-bottom:18px;padding:25px 30px;background:linear-gradient(110deg,#e2f5ff,#f0edff 72%,#fff9e9)}
+.monthly-heading-card h1{margin:4px 0;color:#1e528d;font:800 31px 'Baloo 2',cursive}
+.monthly-heading-card p{margin:0;color:#7c8fa8;font-size:13px}
+.monthly-kicker{color:#3779c7;font-size:10px;font-weight:900;letter-spacing:1.1px}
+.monthly-calendar{position:absolute;top:23px;right:28px;font-size:35px}
+.monthly-month-pill{position:absolute;right:25px;bottom:20px;padding:7px 11px;border-radius:20px;background:#fff;color:#52759d;font-size:10px}
+.monthly-error{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:12px 15px;border-radius:11px;background:#fff0f1;color:#b94350;font-size:12px;font-weight:800}
+.monthly-error button{flex:none;border:0;background:none;color:#276ec2;font:inherit;cursor:pointer}
+.monthly-panel{padding:30px}
+.monthly-loading{text-align:center;color:#758ba5;font-weight:800}
+.monthly-test-meta,.monthly-history-heading{display:flex;align-items:center;justify-content:space-between;gap:15px}
+.monthly-test-meta{color:#8092a8;font-size:11px;font-weight:800}
+.monthly-test-meta strong{color:#3679c8}
+.monthly-progress{height:8px;margin:12px 0 20px;overflow:hidden;border-radius:10px;background:#edf2f8}
+.monthly-progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#50b8ec,#7664e7);transition:width .2s}
+.monthly-topic{color:#738ca8;font-size:11px;font-weight:800}
+.monthly-question-panel h2{min-height:65px;margin:10px 0 22px;color:#234c7c;font:800 26px/1.35 'Baloo 2',cursive}
+.monthly-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.monthly-options button{display:flex;align-items:center;gap:11px;min-height:54px;padding:10px 13px;border:1px solid #e2eaf4;border-radius:12px;background:#fbfdff;color:#395d84;text-align:left;font:700 13px 'Nunito';cursor:pointer;transition:.15s}
+.monthly-options button:hover,.monthly-options button.is-selected{border-color:#75a9e9;background:#eff6ff}
+.monthly-options button>span{display:grid;place-items:center;width:28px;height:28px;flex:none;border-radius:9px;background:#eaf3ff;color:#3476c2;font-size:11px;font-weight:900}
+.monthly-question-nav{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;margin:22px 0 18px}
+.monthly-question-nav button{width:31px;height:31px;border:1px solid #dfe8f3;border-radius:50%;background:#fff;color:#7186a0;font-size:10px;font-weight:900;cursor:pointer}
+.monthly-question-nav button.is-answered{border-color:#91d5b4;background:#e9fff2;color:#238255}
+.monthly-question-nav button.is-current{outline:2px solid #7e66e5;outline-offset:2px;color:#765ee1}
+.monthly-controls{display:flex;justify-content:space-between;gap:10px}
+.monthly-controls>button,.monthly-primary{min-height:44px;padding:10px 17px;border:1px solid #dbe6f3;border-radius:11px;background:#fff;color:#557393;font:800 12px 'Nunito';cursor:pointer}
+.monthly-controls>button:disabled,.monthly-primary:disabled{cursor:not-allowed;opacity:.55}
+.monthly-controls>.monthly-primary,.monthly-primary{border-color:transparent;background:linear-gradient(100deg,#347fe0,#5d67df);color:#fff;box-shadow:0 7px 16px #4c79dc30}
+.monthly-answer-count{display:block;margin-top:12px;color:#8b9bb0;text-align:center;font-size:10px}
+.monthly-start-panel,.monthly-result-panel{text-align:center}
+.monthly-start-icon,.monthly-result-icon{display:grid;place-items:center;width:68px;height:68px;margin:0 auto 16px;border-radius:22px;background:#e9f5ff;font-size:34px}
+.monthly-start-panel h2,.monthly-result-panel h2{margin:5px 0;color:#234e81;font:800 26px 'Baloo 2',cursive}
+.monthly-start-panel>p,.monthly-result-summary{max-width:570px;margin:8px auto 17px;color:#7b8ea5;font-size:13px;line-height:1.7}
+.monthly-facts{display:flex;justify-content:center;flex-wrap:wrap;gap:9px;margin:18px 0 22px}
+.monthly-facts span{padding:9px 12px;border-radius:20px;background:#f0f6fd;color:#587899;font-size:10px;font-weight:800}
+.monthly-start-panel>.monthly-primary{min-width:200px}
+.monthly-score{display:flex;align-items:baseline;justify-content:center;gap:3px;margin:5px 0;color:#276dc2}
+.monthly-score strong{font:800 62px/1 'Baloo 2',cursive}
+.monthly-score span{color:#8a9bb1;font-weight:800}
+.monthly-earned{display:inline-block;padding:9px 14px;border-radius:20px;background:#fff6df;color:#b67d16;font-size:12px;font-weight:900}
+.monthly-review{max-width:680px;margin:28px auto 0;text-align:left}
+.monthly-review h3{margin:0 0 12px;color:#2f5885;font:800 19px 'Baloo 2',cursive}
+.monthly-review article{margin-top:9px;padding:13px 15px;border:1px solid #e8eef5;border-radius:12px;background:#fbfdff}
+.monthly-review article.review-correct{border-left:4px solid #4ab982}.monthly-review article.review-wrong{border-left:4px solid #e78a91}
+.review-heading{display:flex;justify-content:space-between;gap:10px;color:#526e8c;font-size:11px}
+.review-heading span{font-weight:900;color:#258958}.review-wrong .review-heading span{color:#c65360}
+.monthly-review article>p{margin:7px 0;color:#385b80;font-size:12px;font-weight:800}
+.monthly-review article>small{color:#71859e;font-size:10px}
+.monthly-review article>p.review-explanation{margin-bottom:0;color:#7c8fa5;font-size:11px;font-weight:600}
+.monthly-history{margin-top:18px;padding:23px 26px}
+.monthly-history-heading h2{margin:3px 0 0;color:#234d80;font:800 22px 'Baloo 2',cursive}
+.monthly-history-heading>span{padding:6px 10px;border-radius:18px;background:#eef5fd;color:#6885a5;font-size:10px;font-weight:800}
+.monthly-history-list{display:grid;gap:9px;margin-top:14px}
+.monthly-history-list article{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid #edf1f6;border-radius:12px}
+.history-month-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#eef5ff;font-size:20px}
+.monthly-history-list article>div{display:flex;flex:1;flex-direction:column;gap:3px}.monthly-history-list strong{color:#385e86;font-size:12px}.monthly-history-list small{color:#8394a8;font-size:10px}
+.monthly-history-list article>b{color:#246ab8;font:800 20px 'Baloo 2'}.monthly-history-list article>b i{color:#91a0b2;font-size:10px;font-style:normal}
+.monthly-history-empty{margin:14px 0 0;color:#8394a8;font-size:12px}
+@media(max-width:560px){.monthly-header{height:62px;padding:0 15px}.monthly-content{width:94%;padding:18px 0 30px}.monthly-heading-card{min-height:140px;padding:20px 17px}.monthly-heading-card h1{font-size:26px}.monthly-heading-card p{max-width:250px;font-size:11px}.monthly-calendar{top:18px;right:16px;font-size:29px}.monthly-month-pill{right:15px;bottom:14px}.monthly-panel{padding:21px 16px}.monthly-question-panel h2{font-size:22px}.monthly-options{grid-template-columns:1fr;gap:8px}.monthly-options button{min-height:48px}.monthly-controls>button,.monthly-primary{padding:9px 12px}.monthly-history{padding:18px 15px}.monthly-history-heading h2{font-size:19px}}

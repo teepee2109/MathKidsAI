@@ -1,5 +1,15 @@
 # MathKids --- Smart Math Learning Platform
 
+## Gemini cho phân tích năng lực và lộ trình (đang tạm tắt)
+
+Mặc định MathKids tạm dùng lộ trình thích ứng theo điểm kỹ năng, không gọi dịch vụ AI. Khi muốn bật Gemini, backend gọi Gemini API để tạo nhận xét điểm mạnh/yếu và tối đa 3 bước học tập. Frontend không gọi Gemini trực tiếp; API key chỉ nằm trong `MathKids/backend/.env`.
+
+1. Sao chép `MathKids/backend/.env.example` thành `MathKids/backend/.env` nếu chưa có.
+2. Để bật Gemini, đặt `GEMINI_API_ENABLED=true`, thêm `GEMINI_API_KEY` từ Google AI Studio; model mặc định là `gemini-3.8-flash` và có thể đổi bằng `GEMINI_MODEL`.
+3. Khởi động lại backend, sau đó làm/nộp lại bài đánh giá đầu vào để tạo kết quả và lộ trình mới. Tắt Gemini bằng `GEMINI_API_ENABLED=false`.
+
+Kết quả thành công được đánh dấu “Gemini đã phân tích”. Nếu Gemini tắt, key thiếu, model không khả dụng, quota bị chặn, hoặc API trả dữ liệu không hợp lệ, ứng dụng dùng lộ trình dự phòng theo điểm kỹ năng.
+
 > **MathKids** là nền tảng web học Toán thông minh dành cho học sinh
 > tiểu học lớp 1--5, tập trung vào cá nhân hóa lộ trình học bằng AI và
 > kết hợp học tập với trò chơi.
@@ -552,7 +562,7 @@ Responsibilities:
 
 ## 7.5. AI
 
-### OpenAI API
+### Gemini API
 
 AI can be integrated into the backend to support:
 
@@ -576,10 +586,10 @@ Node.js API
 AI Service
    |
    v
-OpenAI API
+Gemini API
 ```
 
-**The OpenAI API key must remain on the backend and must not be exposed
+**The Gemini API key must remain on the backend and must not be exposed
 in React/browser code.**
 
 ------------------------------------------------------------------------
@@ -906,7 +916,7 @@ SQL Server
 For example:
 
 ``` text
-OPENAI_API_KEY=...
+GEMINI_API_KEY=...
 ```
 
 must not be placed directly inside React source code.
@@ -991,7 +1001,7 @@ Database
 └── Prisma ORM
 
 AI
-└── OpenAI API
+└── Gemini API
 
 Game
 └── Phaser.js

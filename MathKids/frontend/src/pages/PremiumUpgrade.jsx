@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import { getAuthToken } from "../authStorage";
 import "./PremiumUpgrade.css";
 
@@ -51,7 +52,7 @@ export default function PremiumUpgrade() {
   }
 
   return <main className="premium-page">
-    <header className="premium-header"><Link className="dashboard-brand" to="/dashboard"><span>★</span> Math<span>Kids</span></Link><Link to="/danh-gia">← Quay lại kết quả</Link></header>
+    <header className="premium-header"><BrandLogo to="/dashboard" /><Link to="/danh-gia">← Quay lại kết quả</Link></header>
     <section className="premium-hero"><span className="premium-sparkle">✦</span><span className="premium-kicker">MATHKIDS PREMIUM</span><h1>Học đúng điều con cần,<br /><em>tiến bộ mỗi ngày</em></h1><p>AI đồng hành cùng con bằng một lộ trình vừa sức, vui vẻ và được cập nhật theo từng bước tiến bộ.</p></section>
     <section className="premium-plans">
       <article className="plan-card free-plan"><div className="plan-heading"><span className="plan-icon">🌱</span><div><h2>Free</h2><p>Khởi đầu vui học mỗi ngày</p></div></div><div className="plan-price"><strong>0đ</strong><span>/ mãi mãi</span></div><button onClick={() => choosePlan("free")} className="plan-button free-button">Gói hiện tại</button><ul>{features.filter((feature) => feature.free).map((feature) => <li key={feature.label}><span>✓</span>{feature.label}</li>)}{features.filter((feature) => !feature.free).slice(0, 2).map((feature) => <li className="not-included" key={feature.label}><span>—</span>{feature.label}</li>)}</ul></article>

@@ -9,3 +9,7 @@
 .avatar-file-button:hover{background:#dcecff}
 .avatar-file-button input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .avatar-file-button:has(input:disabled){opacity:.65;cursor:wait}
+.profile-avatar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.avatar-remove-button{margin-top:4px;padding:7px 11px;border:1px solid #f0d1d1;border-radius:9px;background:#fff;color:#c34343;font-size:11px;font-weight:900;cursor:pointer}
+.avatar-remove-button:hover:not(:disabled){background:#fff1f1}
+.avatar-remove-button:disabled{opacity:.6;cursor:wait}

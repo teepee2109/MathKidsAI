@@ -1,0 +1,7 @@
+.weekly-assessment-invite{display:flex;align-items:center;gap:15px;margin:12px 0;padding:15px 18px;border:1px solid #cfe4fa;border-radius:16px;background:linear-gradient(100deg,#eef8ff,#f7f4ff);color:#244d7d;box-shadow:0 5px 14px #315e8910}
+.weekly-assessment-invite>span{width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:#fff;font-size:23px}
+.weekly-assessment-invite>div{display:grid;gap:3px;flex:1}
+.weekly-assessment-invite strong{font-size:14px}
+.weekly-assessment-invite small{color:#8092a9;font-size:11px}
+.weekly-assessment-invite>b{color:#3478ce;font-size:12px}
+@media(max-width:620px){.weekly-assessment-invite{align-items:flex-start;flex-wrap:wrap}.weekly-assessment-invite>b{margin-left:57px}}

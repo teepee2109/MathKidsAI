@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
+import { claimGameRewards, getQuestionTopics, getQuestions, submitQuestionAnswer } from "../services/questions";
 import "./MathGames.css";
+import "./MathQuestionBank.css";
 
 const games = [
   { grade: 1, icon: "🍎", title: "Nhặt táo tính nhanh", topic: "Cộng trừ trong phạm vi 20", color: "game-red", description: "Giúp bạn nhỏ nhặt đủ táo bằng những phép cộng và trừ đầu tiên." },
@@ -10,121 +13,147 @@ const games = [
   { grade: 5, icon: "🧪", title: "Phòng thí nghiệm số thập phân", topic: "Số thập phân · Tỉ số phần trăm", color: "game-green", description: "Pha chế đáp án chính xác với số thập phân và phần trăm." },
 ];
 
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const formatNumber = (number) => Number(number.toFixed(2)).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
-
-function numericQuestion(prompt, answer, difficulty) {
-  const step = difficulty === 5 ? 0.1 : difficulty === 4 ? 2 : 1;
-  const clean = (value) => Number(Math.max(0, value).toFixed(2));
-  const distractors = new Set();
-  let offset = 1;
-  while (distractors.size < 3) {
-    const sign = offset % 2 === 0 ? -1 : 1;
-    const value = clean(answer + sign * Math.ceil(offset / 2) * step * randomInt(1, 2));
-    if (value !== answer) distractors.add(value);
-    offset += 1;
-  }
-  return finalizeQuestion(prompt, [answer, ...distractors].map(formatNumber), formatNumber(answer), `${prompt} ${formatNumber(answer)}.`);
-}
-
-function finalizeQuestion(prompt, choices, answer, explanation) {
-  const options = [...choices].sort(() => Math.random() - 0.5);
-  return { prompt, options, correctIndex: options.indexOf(answer), explanation };
-}
-
-function fractionQuestion() {
-  const denominator = [2, 3, 4, 5, 8][randomInt(0, 4)];
-  const numeratorA = randomInt(1, denominator - 1);
-  const numeratorB = randomInt(1, denominator - numeratorA);
-  const sum = numeratorA + numeratorB;
-  const gcd = (a, b) => b ? gcd(b, a % b) : a;
-  const divisor = gcd(sum, denominator);
-  const answer = `${sum / divisor}/${denominator / divisor}`;
-  const distractors = new Set();
-  while (distractors.size < 3) {
-    const wrongDenominator = randomInt(2, 12);
-    const wrongNumerator = randomInt(1, wrongDenominator);
-    const wrongDivisor = gcd(wrongNumerator, wrongDenominator);
-    const option = `${wrongNumerator / wrongDivisor}/${wrongDenominator / wrongDivisor}`;
-    if (option !== answer) distractors.add(option);
-  }
-  const prompt = `${numeratorA}/${denominator} + ${numeratorB}/${denominator} = ?`;
-  return finalizeQuestion(prompt, [answer, ...distractors], answer, `Cộng tử số, giữ nguyên mẫu số: ${sum}/${denominator} = ${answer}.`);
-}
-
-function createQuestion(grade) {
-  if (grade === 1) {
-    const a = randomInt(1, 10);
-    const b = randomInt(0, 10);
-    return Math.random() < 0.5 || b > a ? numericQuestion(`${a} + ${b} = ?`, a + b, grade) : numericQuestion(`${a} − ${b} = ?`, a - b, grade);
-  }
-  if (grade === 2) {
-    const kind = randomInt(0, 2);
-    if (kind === 0) { const a = randomInt(15, 79); const b = randomInt(10, 99 - a); return numericQuestion(`${a} + ${b} = ?`, a + b, grade); }
-    if (kind === 1) { const a = randomInt(30, 99); const b = randomInt(10, a); return numericQuestion(`${a} − ${b} = ?`, a - b, grade); }
-    const a = randomInt(2, 5); const b = randomInt(2, 10); return numericQuestion(`${a} × ${b} = ?`, a * b, grade);
-  }
-  if (grade === 3) {
-    if (Math.random() < 0.5) { const a = randomInt(2, 9); const b = randomInt(2, 10); return numericQuestion(`${a} × ${b} = ?`, a * b, grade); }
-    const divisor = randomInt(2, 9); const quotient = randomInt(2, 10); return numericQuestion(`${divisor * quotient} ÷ ${divisor} = ?`, quotient, grade);
-  }
-  if (grade === 4) {
-    const kind = randomInt(0, 2);
-    if (kind === 0) return fractionQuestion();
-    if (kind === 1) { const a = randomInt(12, 89); const b = randomInt(2, 9); return numericQuestion(`${a} × ${b} = ?`, a * b, grade); }
-    const divisor = randomInt(2, 9); const quotient = randomInt(12, 89); return numericQuestion(`${divisor * quotient} ÷ ${divisor} = ?`, quotient, grade);
-  }
-  if (Math.random() < 0.5) {
-    const a = randomInt(12, 98) / 10;
-    const b = randomInt(2, 9);
-    return numericQuestion(`${formatNumber(a)} × ${b} = ?`, a * b, grade);
-  }
-  const percent = [10, 20, 25, 50][randomInt(0, 3)];
-  const amount = randomInt(2, 20) * 10;
-  return numericQuestion(`${percent}% của ${amount} là bao nhiêu?`, amount * percent / 100, grade);
-}
+const currentTime = () => Date.now();
+const elapsedSeconds = (startedAt) => Math.max(0, Math.floor((currentTime() - startedAt) / 1000));
 
 function GameHeader() {
-  return <header className="math-game-header"><Link className="dashboard-brand" to="/dashboard"><span>★</span> Math<span>Kids</span></Link><Link to="/dashboard" className="game-back-link">← Về dashboard</Link></header>;
+  return <header className="math-game-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="game-back-link">← Về dashboard</Link></header>;
 }
 
 function GamePicker() {
-  return <main className="math-games-page"><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn trò chơi của bạn!</h1><p>Mỗi lớp có một thử thách riêng, vừa sức và thật vui.</p></div><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div></section></main>;
+  return <main className="math-games-page"><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn trò chơi của bạn!</h1><p>Mỗi lớp có một thử thách riêng, vừa sức và thật vui.</p></div><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
 }
 
 function PlayGame({ game }) {
+  const [topics, setTopics] = useState([]);
+  const [selectedTopic, setSelectedTopic] = useState("");
+  const [difficulty, setDifficulty] = useState("");
+  const [questions, setQuestions] = useState([]);
   const [round, setRound] = useState(1);
-  const [question, setQuestion] = useState(() => createQuestion(game.grade));
   const [selected, setSelected] = useState(null);
+  const [answerResult, setAnswerResult] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [gameResultIds, setGameResultIds] = useState([]);
+  const [rewardResult, setRewardResult] = useState(null);
+  const [rewardLoading, setRewardLoading] = useState(false);
+  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const questionStartedAt = useRef(0);
+  const submittingRef = useRef(false);
 
-  function chooseAnswer(index) {
-    if (selected !== null) return;
-    setSelected(index);
-    if (index === question.correctIndex) setCorrectCount((count) => count + 1);
-  }
+  const loadTopics = useCallback(async () => {
+    setTopicsLoading(true);
+    setError("");
+    try {
+      const data = await getQuestionTopics(game.grade);
+      setTopics(data.topics || []);
+    } catch (loadError) {
+      setError(loadError.message || "Không thể tải chủ đề.");
+    } finally {
+      setTopicsLoading(false);
+    }
+  }, [game.grade]);
 
-  function nextQuestion() {
-    if (round === 10) { setFinished(true); return; }
-    setRound((current) => current + 1);
-    setQuestion(createQuestion(game.grade));
-    setSelected(null);
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => loadTopics(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTopics]);
 
-  function restart() {
-    setRound(1);
-    setQuestion(createQuestion(game.grade));
-    setSelected(null);
-    setCorrectCount(0);
+  async function startGame() {
+    setLoading(true);
+    setError("");
     setFinished(false);
+    setQuestions([]);
+    setCorrectCount(0);
+    setGameResultIds([]);
+    setRewardResult(null);
+    setSelected(null);
+    setAnswerResult(null);
+    try {
+      const data = await getQuestions({
+        grade: game.grade,
+        topic: selectedTopic || undefined,
+        difficulty: difficulty || undefined,
+        count: 10,
+      });
+      if (!data.questions?.length) throw new Error("Chưa có câu hỏi phù hợp bộ lọc này. Hãy chọn lại chủ đề hoặc độ khó.");
+      setQuestions(data.questions);
+      setRound(1);
+      questionStartedAt.current = currentTime();
+    } catch (loadError) {
+      setError(loadError.message || "Không thể bắt đầu bài luyện tập.");
+    } finally {
+      setLoading(false);
+    }
   }
 
+  async function chooseAnswer(optionKey) {
+    if (selected !== null || submittingRef.current) return;
+    submittingRef.current = true;
+    setSelected(optionKey);
+    setSubmitting(true);
+    setError("");
+    try {
+      const current = questions[round - 1];
+      const result = await submitQuestionAnswer(current.questionId, optionKey, elapsedSeconds(questionStartedAt.current), "Game");
+      setAnswerResult(result);
+      if (result.resultId) setGameResultIds((ids) => [...ids, result.resultId]);
+      if (result.isCorrect) setCorrectCount((count) => count + 1);
+    } catch (submitError) {
+      setSelected(null);
+      setError(submitError.message || "Không thể lưu câu trả lời. Hãy thử lại.");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }
+
+  async function nextQuestion() {
+    if (round >= questions.length) {
+      setRewardLoading(true);
+      setError("");
+      try {
+        const reward = await claimGameRewards(gameResultIds);
+        setRewardResult(reward);
+        setFinished(true);
+      } catch (rewardError) {
+        setError(rewardError.message || "Không thể nhận XP cho lượt chơi.");
+      } finally {
+        setRewardLoading(false);
+      }
+      return;
+    }
+    setRound((current) => current + 1);
+    setSelected(null);
+    setAnswerResult(null);
+    questionStartedAt.current = currentTime();
+  }
+
+  const question = questions[round - 1];
   return <main className="math-games-page"><GameHeader /><section className="play-area">
     <Link className="play-back" to="/tro-choi">← Chọn trò chơi khác</Link>
     <div className={`play-card ${game.color}`}>
-      <div className="play-card-top"><span className="grade-chip">LỚP {game.grade}</span><span className="question-count">{finished ? "HOÀN THÀNH" : `CÂU ${round} / 10`}</span></div>
-      {!finished ? <><div className="play-progress"><span style={{ width: `${round * 10}%` }} /></div><div className="play-game-title"><span>{game.icon}</span><div><small>{game.topic}</small><h1>{game.title}</h1></div></div><div className="math-question">{question.prompt}</div><div className="answer-options">{question.options.map((option, index) => <button key={`${round}-${option}`} className={selected === null ? "" : index === question.correctIndex ? "answer-correct" : index === selected ? "answer-wrong" : "answer-muted"} onClick={() => chooseAnswer(index)} disabled={selected !== null}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}</div>{selected !== null && <div className={`answer-feedback ${selected === question.correctIndex ? "feedback-good" : "feedback-try"}`}><span>{selected === question.correctIndex ? "🎉 Chính xác!" : "💡 Chưa đúng rồi!"}</span><small>{question.explanation}</small></div>}{selected !== null && <button className="next-question" onClick={nextQuestion}>{round === 10 ? "Xem kết quả" : "Câu tiếp theo"} →</button>}</> : <div className="game-result"><span>{correctCount >= 8 ? "🏆" : correctCount >= 5 ? "🌟" : "💪"}</span><h1>{correctCount >= 8 ? "Xuất sắc lắm!" : correctCount >= 5 ? "Làm tốt lắm!" : "Cố gắng thêm nhé!"}</h1><p>Bạn trả lời đúng <strong>{correctCount}/10</strong> câu trong trò chơi lớp {game.grade}.</p><div className="result-actions"><button onClick={restart}>Chơi lại ↻</button><Link to="/tro-choi">Chọn trò khác →</Link></div></div>}
+      <div className="play-card-top"><span className="grade-chip">LỚP {game.grade}</span><span className="question-count">{finished ? "HOÀN THÀNH" : questions.length ? `CÂU ${round} / ${questions.length}` : "QUESTION BANK"}</span></div>
+      {error && <div className="question-bank-error" role="alert">{error}{topics.length === 0 && !topicsLoading && <button onClick={loadTopics}>Tải lại chủ đề</button>}</div>}
+      {finished ? <div className="game-result"><span>{correctCount >= 8 ? "🏆" : correctCount >= 5 ? "🌟" : "💪"}</span><h1>{correctCount >= 8 ? "Xuất sắc lắm!" : correctCount >= 5 ? "Làm tốt lắm!" : "Cố gắng thêm nhé!"}</h1><p>Bạn trả lời đúng <strong>{correctCount}/{questions.length}</strong> câu từ Question Bank lớp {game.grade}.</p><p className="game-xp-reward">⚡ +{rewardResult?.rewardXp || 0} XP · Cấp {rewardResult?.level || "—"}</p><div className="result-actions"><button onClick={startGame}>Làm bài khác ↻</button><Link to="/phan-thuong">Xem XP & sao →</Link></div></div> : questions.length === 0 ? <>
+        <div className="play-game-title"><span>{game.icon}</span><div><small>{game.topic}</small><h1>{game.title}</h1></div></div>
+        <p className="question-bank-intro">Câu hỏi được lấy từ ngân hàng theo chương trình của lớp {game.grade}.</p>
+        <div className="question-bank-filters">
+          <label>Chủ đề<select value={selectedTopic} onChange={(event) => setSelectedTopic(event.target.value)} disabled={topicsLoading}><option value="">Tất cả chủ đề</option>{topics.map((topic) => <option key={topic.code} value={topic.code}>{topic.name}</option>)}</select></label>
+          <label>Độ khó<select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}><option value="">Mọi mức độ</option><option value="1">Dễ</option><option value="2">Trung bình</option><option value="3">Khó</option></select></label>
+        </div>
+        <button className="next-question" disabled={loading || topicsLoading} onClick={startGame}>{loading ? "Đang tải câu hỏi…" : "Bắt đầu bài luyện →"}</button>
+      </> : <>
+        <div className="play-progress"><span style={{ width: `${round / questions.length * 100}%` }} /></div>
+        <div className="play-game-title"><span>{game.icon}</span><div><small>{question.topic.name} · {question.difficulty === 1 ? "Dễ" : question.difficulty === 2 ? "Trung bình" : "Khó"}</small><h1>{game.title}</h1></div></div>
+        <div className="math-question">{question.questionText}</div>
+        <div className="answer-options">{question.options.map((option) => <button key={option.key} className={selected === null ? "" : option.key === answerResult?.correctAnswer ? "answer-correct" : option.key === selected ? "answer-wrong" : "answer-muted"} onClick={() => chooseAnswer(option.key)} disabled={selected !== null || submitting}><span>{option.key}</span>{option.text}</button>)}</div>
+        {answerResult && <div className={`answer-feedback ${answerResult.isCorrect ? "feedback-good" : "feedback-try"}`} role="status"><span>{answerResult.isCorrect ? "🎉 Chính xác!" : `💡 Đáp án đúng: ${answerResult.correctAnswer}`}</span><small>{answerResult.explanation}</small></div>}
+        {answerResult && <button className="next-question" onClick={nextQuestion} disabled={rewardLoading}>{rewardLoading ? "Đang cộng XP…" : round === questions.length ? "Xem kết quả & nhận XP" : "Câu tiếp theo"} →</button>}
+      </>}
     </div>
   </section></main>;
 }

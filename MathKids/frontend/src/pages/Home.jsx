@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import "./Home.css";
 
 const navItems = [["⌂", "Trang chủ", "#top"], ["▣", "Học tập", "#features"], ["⌁", "Trò chơi", "#games"], ["♜", "Thử thách", "#challenge"], ["▣", "Phần thưởng", "#rewards"]];
@@ -32,7 +33,7 @@ function Home({ isAuthenticated = false, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return <main className="home" id="top">
     <header className="navbar">
-      <a className="brand" href="#top"><span className="brand-star">★</span><span>Math<span>Kids</span></span></a>
+      <BrandLogo className="brand" to="/" />
       <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Mở menu">☰</button>
       <nav className={menuOpen ? "nav-links open" : "nav-links"}>{navItems.map(([icon, label, href], index) => <a className={index === 0 ? "active" : ""} href={href} key={label}><i>{icon}</i>{label}</a>)}</nav>
       <NotificationBell isAuthenticated={isAuthenticated} />

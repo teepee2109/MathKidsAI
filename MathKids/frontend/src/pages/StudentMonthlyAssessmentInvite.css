@@ -1,0 +1,8 @@
+.monthly-assessment-invite{display:flex;align-items:center;gap:13px;margin:12px 0;padding:14px 17px;border:1px solid #f0dca9;border-radius:15px;background:linear-gradient(100deg,#fffaf0,#fff 70%);text-decoration:none;transition:transform .15s,border-color .15s}
+.monthly-assessment-invite:hover{transform:translateY(-2px);border-color:#e8c46d}
+.monthly-assessment-invite>span:first-child{display:grid;place-items:center;width:43px;height:43px;flex:none;border-radius:13px;background:#fff1cf;font-size:23px}
+.monthly-assessment-invite>div{display:grid;gap:3px;min-width:0;flex:1}
+.monthly-assessment-invite strong{color:#315b87;font-size:13px}
+.monthly-assessment-invite small{color:#8192a7;font-size:10px;line-height:1.5}
+.monthly-assessment-invite>b{color:#bd8318;font-size:11px;white-space:nowrap}
+@media(max-width:560px){.monthly-assessment-invite{align-items:flex-start;gap:9px;padding:12px}.monthly-assessment-invite>span:first-child{width:36px;height:36px;font-size:19px}.monthly-assessment-invite>b{align-self:center;font-size:9px}}

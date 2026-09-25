@@ -46,7 +46,38 @@ Backend xác thực ID token với Google, kiểm tra audience, issuer và email
 - `GET /api/students/me/dashboard` — hồ sơ, lớp, XP, sao, số bài học và bài đánh giá; cần JWT.
 - `GET /api/students/me/profile` — tải hồ sơ học sinh; cần JWT.
 - `PATCH /api/students/me/profile` — cập nhật tên, email, ngày sinh, lớp, URL ảnh đại diện; cần JWT.
+- `GET /api/students/me/monthly-assessment` — trạng thái bài tháng hiện tại và lịch sử 12 bài gần nhất; cần JWT.
+- `POST /api/students/me/monthly-assessment/start` — bắt đầu hoặc tiếp tục bài tháng; cần JWT.
+- `POST /api/students/me/monthly-assessment/:attemptId/submit` — nộp đủ 10 câu để chấm và nhận thưởng; cần JWT.
+- `GET /api/students/me/weekly-assessment` — tải trạng thái đánh giá tuần, lịch sử và mức luyện tập đề xuất; cần JWT.
+- `POST /api/students/me/weekly-assessment/start` — bắt đầu hoặc tiếp tục đánh giá tuần; cần JWT.
+- `POST /api/students/me/weekly-assessment/:attemptId/submit` — nộp 10 câu đánh giá để điều chỉnh độ khó; cần JWT.
 - `GET /api/admin/dashboard` — số liệu và danh sách tài khoản gần đây; chỉ Admin mới được phép truy cập.
+
+## Kiểm tra tháng cho học sinh
+
+Migration `migrations/MonthlyAssessment.sql` được áp dụng tự động khi backend khởi động (và kiểm tra lại khi gọi API). Mỗi học sinh có tối đa một bài được tính cho mỗi tháng theo giờ Việt Nam. Bài đang làm được lưu trên server để có thể tiếp tục trên thiết bị khác; câu trả lời hiện tại được giữ tạm trên thiết bị cho tới khi nộp. Question Bank cần có ít nhất 10 câu đang hoạt động cho lớp của học sinh.
+
+Trong Postman, đăng nhập trước qua `/api/auth/login`, rồi dùng token trả về làm header `Authorization: Bearer <token>`:
+
+1. `GET http://localhost:4000/api/students/me/monthly-assessment` — xem tháng, lớp, trạng thái hiện tại và lịch sử. API không trả đáp án đúng.
+2. `POST http://localhost:4000/api/students/me/monthly-assessment/start` với body JSON `{}` — tạo bài 10 câu ngẫu nhiên hoặc lấy lại bài đang làm. API chỉ trả nội dung và 4 lựa chọn.
+3. `POST http://localhost:4000/api/students/me/monthly-assessment/<attemptId>/submit` với body JSON dưới đây; dùng đúng 10 `questionId` nhận từ bước 2 và chọn `A`, `B`, `C` hoặc `D`:
+
+```json
+{
+  "answers": [
+    { "questionId": 101, "answer": "A" },
+    { "questionId": 102, "answer": "C" }
+  ]
+}
+```
+
+Body minh họa trên cần bổ sung đủ 10 câu trước khi gửi. Backend đối chiếu đáp án với SQL Server, chỉ trả lời giải/đáp án đúng sau khi nộp, lưu điểm và cộng XP/sao trong cùng transaction. XP = 10 + 2 cho mỗi câu đúng; sao: 3 sao từ 90 điểm, 2 sao từ 70, 1 sao từ 50, dưới 50 không có sao. Bài tháng này đã nộp thì không thể nộp lại.
+
+## Đánh giá năng lực hàng tuần
+
+Migration `migrations/WeeklyAssessment.sql` được chạy tự động khi backend khởi động. Học sinh có một bài 10 câu mỗi tuần (tuần bắt đầu thứ Hai theo giờ Việt Nam); câu hỏi được cố định khi bắt đầu và đáp án đúng chỉ trả về sau khi nộp. Mức luyện tập kế tiếp tăng một bậc khi đạt từ 80/100, giảm một bậc khi dưới 50/100, còn lại giữ nguyên (mức 1–3). Lộ trình bài học lấy mức này để chọn câu luyện tập từ Question Bank. Điểm đánh giá tuần dùng để cá nhân hóa độ khó, không cộng XP/sao.
 
 Nếu dùng named instance, SQL Server Browser hoặc TCP/IP phải được bật. Nếu instance dùng port cố định, đặt port đó trong `DB_PORT` và có thể bỏ `DB_INSTANCE`.
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import "./StudentProfile.css";
 import "./StudentProfileAvatar.css";
@@ -19,6 +20,7 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [removingAvatar, setRemovingAvatar] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [premiumStatus, setPremiumStatus] = useState({ loading: true, isPremium: Boolean(cachedUser?.isPremium), subscription: cachedUser?.premiumExpiresAt ? { expiresAt: cachedUser.premiumExpiresAt } : null, error: "", hasCachedStatus: typeof cachedUser?.isPremium === "boolean" });
@@ -137,6 +139,30 @@ export default function StudentProfile() {
     }
   }
 
+  async function removeAvatar() {
+    if (!profile.avatarUrl || uploadingAvatar || removingAvatar) return;
+    setRemovingAvatar(true);
+    setPageError("");
+    setSaved(false);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/students/me/avatar`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể xóa ảnh đại diện.");
+      setProfile((current) => ({ ...current, avatarUrl: "" }));
+      setAvatarPreview("");
+      setAvatarFailed(false);
+      saveCachedUser({ ...(getCachedUser() || {}), avatarUrl: "" });
+      setSaved(true);
+    } catch (error) {
+      setPageError(error.message || "Không thể xóa ảnh đại diện.");
+    } finally {
+      setRemovingAvatar(false);
+    }
+  }
+
   async function saveProfile(event) {
     event.preventDefault();
     setSaving(true);
@@ -170,7 +196,7 @@ export default function StudentProfile() {
   }
 
   return <main className="profile-page">
-    <header className="profile-header"><Link to="/dashboard" className="dashboard-brand"><span>★</span> Math<span>Kids</span></Link><Link to="/dashboard" className="back-dashboard">← Quay lại dashboard</Link></header>
+    <header className="profile-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="back-dashboard">← Quay lại dashboard</Link></header>
     <section className="profile-card">
       <div className="profile-heading"><span className="profile-heading-icon">👤</span><div><small>THÔNG TIN TÀI KHOẢN</small><h1>Hồ sơ học sinh</h1><p>Cập nhật thông tin để cá nhân hóa hành trình học tập.</p></div></div>
       <section className={`profile-premium-status ${premiumStatus.isPremium ? "is-active" : "is-free"}`} aria-label="Trạng thái tài khoản">
@@ -182,7 +208,7 @@ export default function StudentProfile() {
         {!premiumStatus.loading && !(premiumStatus.error && !premiumStatus.hasCachedStatus) && (premiumStatus.isPremium ? <Link to="/danh-gia" className="profile-premium-action">Xem lộ trình →</Link> : <Link to="/premium" className="profile-premium-action">Nâng cấp Premium →</Link>)}
       </section>
       {loading && !profile.name && !profile.email ? <div className="profile-loading">Đang tải hồ sơ…</div> : <form className="profile-form" onSubmit={saveProfile}>
-        <div className="profile-avatar-row"><div className="profile-avatar-preview">{!avatarFailed && (avatarPreview || profile.avatarUrl) ? <img src={avatarPreview || resolveAvatarUrl(profile.avatarUrl)} alt="Ảnh đại diện xem trước" onError={() => setAvatarFailed(true)} /> : <span className="profile-default-avatar">👦</span>}</div><div className="profile-avatar-control"><strong>Ảnh đại diện</strong><span>PNG, JPG hoặc WEBP · tối đa 5 MB</span><label className="avatar-file-button">{uploadingAvatar ? "Đang tải ảnh…" : "Chọn ảnh từ máy"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} disabled={uploadingAvatar} /></label></div></div>
+        <div className="profile-avatar-row"><div className="profile-avatar-preview">{!avatarFailed && (avatarPreview || profile.avatarUrl) ? <img src={avatarPreview || resolveAvatarUrl(profile.avatarUrl)} alt="Ảnh đại diện xem trước" onError={() => setAvatarFailed(true)} /> : <span className="profile-default-avatar">👦</span>}</div><div className="profile-avatar-control"><strong>Ảnh đại diện</strong><span>PNG, JPG hoặc WEBP · tối đa 5 MB</span><div className="profile-avatar-actions"><label className="avatar-file-button">{uploadingAvatar ? "Đang tải ảnh…" : "Chọn ảnh từ máy"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} disabled={uploadingAvatar || removingAvatar} /></label>{profile.avatarUrl && <button type="button" className="avatar-remove-button" onClick={removeAvatar} disabled={uploadingAvatar || removingAvatar}>{removingAvatar ? "Đang xóa…" : "Xóa ảnh"}</button>}</div></div></div>
         <label className="profile-field"><span>Họ và tên</span><input name="name" value={profile.name} onChange={updateField} maxLength={120} required />{fieldErrors.name && <small>{fieldErrors.name}</small>}</label>
         <label className="profile-field"><span>Email đăng nhập</span><input type="email" name="email" value={profile.email} onChange={updateField} maxLength={255} required />{fieldErrors.email && <small>{fieldErrors.email}</small>}</label>
         <div className="profile-row">

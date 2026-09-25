@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import { getAuthToken, getCachedUser } from "../authStorage";
 import "./AdminDashboard.css";
 
@@ -45,7 +45,7 @@ export default function AdminDashboard({ onLogout }) {
 
   return <main className="admin-shell">
     <aside className="admin-sidebar">
-      <Link className="admin-brand" to="/admin/dashboard"><span>★</span> Math<span>Kids</span></Link>
+      <BrandLogo className="admin-brand" to="/admin/dashboard" />
       <div className="admin-nav-label">QUẢN TRỊ</div>
       <a className="admin-nav-item active" href="#overview"><span>▦</span> Tổng quan</a>
       <a className="admin-nav-item" href="#accounts"><span>♙</span> Tài khoản</a>

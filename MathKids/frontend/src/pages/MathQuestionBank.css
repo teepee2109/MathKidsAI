@@ -1,0 +1,8 @@
+.question-bank-intro{margin:15px 0;color:#8091a5;font-size:12px}
+.question-bank-filters{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:17px 0}
+.question-bank-filters label{display:grid;gap:6px;color:#516f91;font-size:11px;font-weight:900}
+.question-bank-filters select{width:100%;padding:11px 12px;border:1px solid #dce7f2;border-radius:10px;background:#fff;color:#34577b;font:700 12px 'Nunito',sans-serif}
+.question-bank-error{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;padding:10px 12px;border:1px solid #f0d0d0;border-radius:10px;background:#fff3f3;color:#b83b3b;font-size:11px;font-weight:800}
+.question-bank-error button{flex:0 0 auto;padding:6px 9px;border:1px solid #e4caca;border-radius:8px;background:#fff;color:#a63838;font-weight:800;cursor:pointer}
+.next-question:disabled{cursor:wait;opacity:.65}
+@media(max-width:480px){.question-bank-filters{grid-template-columns:1fr}}
