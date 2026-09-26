@@ -1,3 +1,4 @@
+import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import StudentDashboard from "./pages/StudentDashboard";
@@ -35,7 +36,8 @@ function AppRoutes() {
   const dashboardPath = currentUser?.role === "Admin" ? "/admin/dashboard" : "/dashboard";
 
   return <Routes>
-    <Route path="/" element={isAuthenticated ? <Navigate to={dashboardPath} replace /> : <Home />} />
+    <Route path="/" element={isAuthenticated ? <Navigate to={dashboardPath} replace /> : <Landing />} />
+    <Route path="/home" element={<Home isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
     <Route path="/dashboard" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : <StudentDashboard onLogout={handleLogout} />} />
     <Route path="/admin/dashboard" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to="/dashboard" replace />} />
     <Route path="/ho-so" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : <StudentProfile />} />
