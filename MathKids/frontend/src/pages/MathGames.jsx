@@ -78,6 +78,7 @@ function PlayGame({ game }) {
         topic: selectedTopic || undefined,
         difficulty: difficulty || undefined,
         count: 10,
+        activity: "game",
       });
       if (!data.questions?.length) throw new Error("Chưa có câu hỏi phù hợp bộ lọc này. Hãy chọn lại chủ đề hoặc độ khó.");
       setQuestions(data.questions);

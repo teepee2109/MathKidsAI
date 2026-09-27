@@ -9,6 +9,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const error = new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể kết nối máy chủ.");
     error.status = response.status;
+    error.code = data.code;
     throw error;
   }
   return data;

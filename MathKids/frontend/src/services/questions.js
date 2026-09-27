@@ -20,10 +20,11 @@ export function getQuestionTopics(grade) {
   return request(`questions/topics?${new URLSearchParams({ grade: String(grade) })}`);
 }
 
-export function getQuestions({ grade, topic, difficulty, count = 10 }) {
+export function getQuestions({ grade, topic, difficulty, count = 10, activity }) {
   const query = new URLSearchParams({ grade: String(grade), count: String(count) });
   if (topic) query.set("topic", topic);
   if (difficulty) query.set("difficulty", String(difficulty));
+  if (activity) query.set("activity", activity);
   return request(`questions?${query}`);
 }
 

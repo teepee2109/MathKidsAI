@@ -46,6 +46,11 @@ export default function LearningPath({ onLogout }) {
 
   const lesson = useMemo(() => pathData?.lessons?.find((item) => String(item.lessonId) === lessonId), [pathData, lessonId]);
   const currentQuestion = practice[practiceIndex];
+  const selectedOptionText = currentQuestion?.options?.find((option) => option.key === answerResult?.answer)?.text;
+  const correctOptionText = currentQuestion?.options?.find((option) => option.key === answerResult?.correctAnswer)?.text;
+  const answerFeedback = answerResult?.feedback && !/\b(undefined|null)\b/i.test(answerResult.feedback)
+    ? answerResult.feedback
+    : `Em chọn ${answerResult?.answer || "?"}${selectedOptionText ? `: “${selectedOptionText}”` : ""}. Đáp án đúng ${answerResult?.correctAnswer || "?"}${correctOptionText ? `: “${correctOptionText}”` : ""}. Cách giải: ${answerResult?.explanation || "Hãy xem lại lý thuyết và tính lại từng bước."}`;
 
   async function startPractice() {
     if (!lesson || practiceLoading) return;
@@ -118,7 +123,8 @@ export default function LearningPath({ onLogout }) {
       <Link className="learning-back" to="/dashboard">← Về dashboard</Link>
       {error && <div className="learning-alert" role="alert">{error}<button onClick={loadPath}>Thử lại</button></div>}
       {loading ? <div className="learning-loading" role="status">Đang tải lộ trình học…</div> : pathData && <>
-        <section className="learning-path-heading"><div><span className="learning-kicker">{["AI", "Gemini", "ChatGPT"].includes(pathData.generatedBy) ? `LỘ TRÌNH ${pathData.generatedBy === "AI" ? "AI" : pathData.generatedBy.toUpperCase()} ĐỀ XUẤT` : "LỘ TRÌNH CÁ NHÂN HÓA"} · LỚP {pathData.grade}</span><h1>Học tập theo từng bước</h1><p>Bài học theo chương trình, ưu tiên nội dung trong kết quả đánh giá và phần bạn cần củng cố.</p></div><div className="learning-completion-count"><strong>{pathData.completedCount}</strong><span>/ {pathData.lessons.length} bài hoàn thành</span></div></section>
+        <section className="learning-path-heading"><div><span className="learning-kicker">{["AI", "Gemini", "ChatGPT"].includes(pathData.generatedBy) ? `LỘ TRÌNH ${pathData.generatedBy === "AI" ? "AI" : pathData.generatedBy.toUpperCase()} ĐỀ XUẤT` : pathData.premiumRequired ? "BÀI HỌC THEO CHƯƠNG TRÌNH" : "LỘ TRÌNH CÁ NHÂN HÓA"} · LỚP {pathData.grade}</span><h1>Học tập theo từng bước</h1><p>Bài học theo chương trình, ưu tiên nội dung trong kết quả đánh giá và phần bạn cần củng cố.</p></div><div className="learning-completion-count"><strong>{pathData.completedCount}</strong><span>/ {pathData.lessons.length} bài hoàn thành</span></div></section>
+        {pathData.premiumRequired && <div role="note" style={{ marginTop: 12, padding: "12px 16px", border: "1px solid #f1dfb6", borderRadius: 12, background: "#fffaf0", color: "#80652d", fontSize: 12 }}>Đang xem các bài học cơ bản theo lớp. <Link to="/premium" style={{ color: "#3478ce", fontWeight: 900 }}>Mở khóa gợi ý cá nhân hóa với Premium →</Link></div>}
         <div className="learning-path-layout">
           <section className="learning-path-list" aria-label="Danh sách bài học">
             <div className="learning-recommendation"><span>🧭</span><div><small>BÀI HỌC ĐƯỢC GỢI Ý</small><strong>{pathData.lessons.find((item) => item.lessonId === pathData.recommendedLessonId)?.title || "Bạn đã hoàn thành lộ trình!"}</strong><p>{pathData.recommendation}</p></div></div>
@@ -129,14 +135,14 @@ export default function LearningPath({ onLogout }) {
             {!lesson ? <div className="learning-empty"><span>{lessonId ? "🔎" : "📖"}</span><h2>{lessonId ? "Không tìm thấy bài học" : "Chọn một bài để bắt đầu"}</h2><p>{lessonId ? "Bài học này không thuộc lớp hiện tại hoặc đã được gỡ khỏi lộ trình." : "Đọc nội dung, xem ví dụ từng bước rồi luyện vài câu hỏi để củng cố kiến thức."}</p>{lessonId && <Link to="/hoc-tap" className="learning-primary">Quay lại lộ trình</Link>}</div> : <>
               <div className="learning-lesson-top"><span className="learning-lesson-icon">{icons[lesson.sortOrder - 1] || "📘"}</span><span className="learning-kicker">BÀI HỌC · {lesson.topic.name.toLocaleUpperCase("vi-VN")}</span>{lesson.isCompleted && <span className="learning-done-chip">✓ ĐÃ HOÀN THÀNH</span>}</div>
               <h2>{lesson.title}</h2><p className="learning-introduction">{lesson.introduction}</p>
-              <article className="learning-concept"><small>Ý CHÍNH CẦN NHỚ</small><p>{lesson.keyConcept}</p></article>
+              <article className="learning-concept"><small>LÝ THUYẾT · Ý CHÍNH CẦN NHỚ</small><p>{lesson.keyConcept}</p></article>
               <article className="learning-example"><small>VÍ DỤ TỪNG BƯỚC</small><p>{lesson.workedExample}</p></article>
               <section className="learning-practice"><div className="learning-practice-heading"><span>✏️</span><div><strong>Luyện tập để ghi nhớ</strong><small>Câu hỏi lớp {pathData.grade} · mức { ["", "cơ bản", "trung bình", "nâng cao"][lesson.recommendedDifficulty || pathData.recommendedDifficulty || 1] }{lesson.assessmentSource ? ` theo ${lesson.assessmentSource.toLowerCase()}` : " phù hợp chương trình"}</small></div></div>
                 {practice.length === 0 ? <button className="learning-primary" onClick={startPractice} disabled={practiceLoading}>{practiceLoading ? "Đang tải câu hỏi…" : "Bắt đầu luyện tập →"}</button> : practiceIndex >= practice.length ? <div className="learning-practice-finished" role="status"><strong>Hoàn thành phần luyện tập!</strong><span>Đúng {correctCount}/{practice.length} câu. Hãy cập nhật tiến độ để ghi nhận bài đã học.</span></div> : <>
                   <div className="learning-practice-progress">CÂU {practiceIndex + 1} / {practice.length}</div><p className="learning-practice-question">{currentQuestion.questionText}</p>
                   <div className="learning-practice-options">{currentQuestion.options.map((option) => <button key={option.key} disabled={Boolean(answerResult) || answerSubmitting} className={answerResult ? option.key === answerResult.correctAnswer ? "is-correct" : "is-muted" : ""} onClick={() => answerQuestion(option.key)}><b>{option.key}</b>{option.text}</button>)}</div>
                   {answerSubmitting && <small className="learning-submitting" role="status">Đang kiểm tra đáp án…</small>}
-                  {answerResult && <div className={`learning-answer-feedback ${answerResult.isCorrect ? "is-right" : "is-wrong"}`} role="status"><strong>{answerResult.isCorrect ? "Chính xác!" : `Đáp án đúng: ${answerResult.correctAnswer}`}</strong><span>{answerResult.explanation}</span><button onClick={nextPracticeQuestion}>{practiceIndex + 1 === practice.length ? "Xem kết quả" : "Câu tiếp theo →"}</button></div>}
+                  {answerResult && <div className={`learning-answer-feedback ${answerResult.isCorrect ? "is-right" : "is-wrong"}`} role="status"><strong>{answerResult.isCorrect ? "Chính xác!" : "Chưa đúng — cùng xem vì sao nhé."}</strong><span>{answerFeedback}</span><button onClick={nextPracticeQuestion}>{practiceIndex + 1 === practice.length ? "Xem kết quả" : "Câu tiếp theo →"}</button></div>}
                 </>}
               </section>
               {practiceError && <p className="learning-alert learning-inline-alert" role="alert">{practiceError}</p>}

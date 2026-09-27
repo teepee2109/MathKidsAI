@@ -20,6 +20,7 @@ export default function WeeklyAssessment({ onLogout }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [premiumRequired, setPremiumRequired] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -35,6 +36,7 @@ export default function WeeklyAssessment({ onLogout }) {
       setError("");
     } catch (loadError) {
       if (loadError.status === 401) onLogout();
+      if (loadError.code === "PREMIUM_REQUIRED") setPremiumRequired(true);
       setError(loadError.message || "Không thể tải đánh giá tuần.");
     } finally { setLoading(false); }
   }, [onLogout]);
@@ -57,6 +59,7 @@ export default function WeeklyAssessment({ onLogout }) {
       setData((existing) => ({ ...existing, current: attempt }));
     } catch (startError) {
       if (startError.status === 401) onLogout();
+      if (startError.code === "PREMIUM_REQUIRED") setPremiumRequired(true);
       if (startError.status === 409) await load();
       setError(startError.message || "Không thể bắt đầu đánh giá tuần.");
     } finally { setBusy(false); }
@@ -78,6 +81,7 @@ export default function WeeklyAssessment({ onLogout }) {
       }));
     } catch (submitError) {
       if (submitError.status === 401) onLogout();
+      if (submitError.code === "PREMIUM_REQUIRED") setPremiumRequired(true);
       setError(submitError.message || "Không thể nộp bài đánh giá tuần.");
     } finally { setBusy(false); }
   }
@@ -88,6 +92,7 @@ export default function WeeklyAssessment({ onLogout }) {
       <section className="weekly-heading"><span className="weekly-kicker">ĐÁNH GIÁ NĂNG LỰC · LỚP {data?.grade || "—"}</span><h1>Thử thách kiến thức tuần</h1><p>Kết quả giúp điều chỉnh độ khó bài luyện tập tuần sau cho phù hợp với con.</p>
         {data && <div className="weekly-level-chip">Độ khó hiện tại: <strong>{levelNames[data.recommendedDifficulty]}</strong></div>}
       </section>
+      {premiumRequired ? <section className="weekly-panel weekly-start"><span className="weekly-kicker">TÍNH NĂNG PREMIUM</span><h2>Mở khóa đánh giá năng lực tuần</h2><p>Bài đánh giá tuần và khả năng điều chỉnh độ khó dành cho thành viên Premium. Bài học chương trình cơ bản vẫn luôn khả dụng.</p><Link className="weekly-primary" to="/premium">Xem các gói Premium →</Link></section> : <>
       {error && <div className="weekly-error" role="alert">{error}<button onClick={load}>Thử lại</button></div>}
       {loading ? <section className="weekly-panel">Đang tải đánh giá tuần…</section> : current?.status === "InProgress" && question ? <section className="weekly-panel weekly-quiz">
         <div className="weekly-quiz-meta"><span>{formatWeek(current.weekStart)} · Mức {levelNames[current.difficulty]}</span><strong>Câu {index + 1}/{questions.length}</strong></div>
@@ -110,6 +115,7 @@ export default function WeeklyAssessment({ onLogout }) {
         <button className="weekly-primary" disabled={busy} onClick={start}>{busy ? "Đang chuẩn bị…" : "Bắt đầu đánh giá →"}</button>
       </section>}
       <section className="weekly-history"><h2>Lịch sử đánh giá tuần</h2>{data?.history?.length ? data.history.map((item) => <article key={item.weekStart}><span>{formatWeek(item.weekStart)}</span><b>{item.score}/100</b><small>{levelNames[item.difficulty]}</small></article>) : <p>Kết quả các tuần đã hoàn thành sẽ hiển thị tại đây.</p>}</section>
+      </>}
     </div>
   </main>;
 }

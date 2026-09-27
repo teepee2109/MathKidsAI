@@ -216,6 +216,23 @@ async function ensureWeeklyAssessmentSchema() {
   }
 }
 
+async function hasActivePremium(pool, userId) {
+  const result = await pool.request().input("userId", sql.Int, userId).query(`
+    SELECT TOP 1 1 AS IsPremium
+    FROM [mk].[PremiumSubscription]
+    WHERE UserId = @userId AND Status = 'Active' AND ExpiresAt > SYSUTCDATETIME()
+  `);
+  return Boolean(result.recordset[0]);
+}
+
+function premiumRequired(response, feature) {
+  return response.status(403).json({
+    code: "PREMIUM_REQUIRED",
+    feature,
+    message: "Tính năng này dành cho thành viên MathKids Premium. Hãy nâng cấp để tiếp tục.",
+  });
+}
+
 function signSePayFields(fields) {
   const signedFields = ["order_amount", "merchant", "currency", "operation", "order_description", "order_invoice_number", "customer_id", "payment_method", "success_url", "error_url", "cancel_url"];
   const signedString = signedFields.filter((field) => fields[field] !== undefined && fields[field] !== null && fields[field] !== "").map((field) => `${field}=${fields[field]}`).join(",");
@@ -661,7 +678,13 @@ app.post("/api/students/me/assessment/start", authenticate, async (request, resp
     const topicsResult = await pool.request().query("SELECT TopicId, TopicCode, TopicName FROM [mk].[Topic]");
     const topicMap = new Map(topicsResult.recordset.map((topic) => [topic.TopicCode, topic]));
     if (assessmentSkills.some((skill) => !topicMap.has(skill.code))) return response.status(503).json({ message: "Thiếu dữ liệu chủ đề toán học. Hãy chạy script MathKidsDB.sql mới nhất." });
-    await transaction.begin();
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const previousAttempt = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT TOP 1 AttemptId FROM [mk].[PlacementAttempt] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId AND SubmittedAt IS NOT NULL");
+    if (previousAttempt.recordset.length) {
+      await transaction.rollback();
+      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", message: "Bài kiểm tra đầu vào chỉ được thực hiện một lần. Bạn có thể xem lại điểm và lộ trình học của mình." });
+    }
     const testResult = await transaction.request().input("grade", sql.TinyInt, gradeInput)
       .query("INSERT INTO [mk].[PlacementTest] (Title, Grade, IsActive) OUTPUT INSERTED.PlacementTestId VALUES (N'Đánh giá năng lực toán lớp ' + CAST(@grade AS NVARCHAR(1)), @grade, 1)");
     const testId = testResult.recordset[0].PlacementTestId;
@@ -726,12 +749,22 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
     });
     const skillScores = [...skillMap.values()].map((skill) => ({ code: skill.code, name: attempt.Grade === 1 && skill.code === "ARITHMETIC_MUL_DIV" ? "Tư duy số" : skill.name, score: Math.round(skill.correct / skill.total * 100), correct: skill.correct, total: skill.total }));
     const overallScore = Math.round(markedAnswers.filter((answer) => answer.isCorrect).length * 10);
-    const advice = await createLearningAdvice(skillScores, attempt.Grade);
+    const isPremium = await hasActivePremium(pool, request.user.userId);
+    const advice = isPremium
+      ? await createLearningAdvice(skillScores, attempt.Grade)
+      : { summary: "Đã lưu kết quả và bản đồ kỹ năng. Nâng cấp Premium để mở lộ trình học cá nhân hóa.", strengths: [], focus: [], roadmap: [], generatedBy: "System", premiumRequired: true };
     let earnedXp = 0;
     let earnedStars = 0;
     let rewardAlreadyClaimed = false;
     transaction = new sql.Transaction(pool);
-    await transaction.begin();
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const priorSubmission = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .input("attemptId", sql.BigInt, attemptId)
+      .query("SELECT TOP 1 AttemptId FROM [mk].[PlacementAttempt] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId AND SubmittedAt IS NOT NULL AND AttemptId <> @attemptId");
+    if (priorSubmission.recordset.length) {
+      await transaction.rollback();
+      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", message: "Bài kiểm tra đầu vào chỉ được thực hiện một lần. Bạn có thể xem lại điểm và lộ trình học của mình." });
+    }
     const claimDate = vietnamDateKey();
     const existingClaim = await transaction.request()
       .input("studentId", sql.Int, request.user.userId)
@@ -779,6 +812,7 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
         .input("answer", sql.NVarChar(sql.MAX), JSON.stringify({ answer: answer.answer })).input("correct", sql.Bit, answer.isCorrect)
         .query("INSERT INTO [mk].[PlacementAnswer] (AttemptId, QuestionId, AnswerData, IsCorrect) VALUES (@attemptId, @questionId, @answer, @correct)");
     }
+    if (isPremium) {
     await transaction.request().input("studentId", sql.Int, request.user.userId)
       .query("UPDATE [mk].[LearningPath] SET Status = 'Archived', EndDate = CAST(SYSUTCDATETIME() AS DATE) WHERE StudentId = @studentId AND Status = 'Active'");
     const pathResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
@@ -798,8 +832,9 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
         .input("plannedDate", sql.Date, plannedDate).input("order", sql.SmallInt, index + 1)
         .query("INSERT INTO [mk].[LearningPathItem] (LearningPathId, TopicId, PlannedDate, ItemOrder) VALUES (@pathId, @topicId, @plannedDate, @order)");
     }
+    }
     await transaction.commit();
-    return response.json({ attemptId, ...summary });
+    return response.json({ attemptId, ...summary, isPremium });
   } catch (error) {
     if (transaction) await transaction.rollback().catch(() => {});
     return response.status(500).json({ message: "Không thể chấm bài hoặc tạo lộ trình.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
@@ -816,7 +851,11 @@ app.get("/api/students/me/assessment/latest", authenticate, async (request, resp
       ORDER BY SubmittedAt DESC
     `);
     const attempt = result.recordset[0];
-    return response.json({ result: attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...JSON.parse(attempt.AbilitySummary) } : null });
+    let resultData = attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...JSON.parse(attempt.AbilitySummary) } : null;
+    if (resultData && !await hasActivePremium(pool, request.user.userId)) {
+      resultData = { ...resultData, isPremium: false, advice: { summary: "Kết quả và bản đồ kỹ năng của con đã được lưu. Nâng cấp Premium để mở phân tích và lộ trình cá nhân hóa.", strengths: [], focus: [], roadmap: [], generatedBy: "System", premiumRequired: true } };
+    } else if (resultData) resultData.isPremium = true;
+    return response.json({ result: resultData });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải kết quả đánh giá.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
@@ -825,6 +864,7 @@ app.get("/api/students/me/assessment/latest", authenticate, async (request, resp
 app.get("/api/students/me/assessment/history", authenticate, async (request, response) => {
   try {
     const pool = await getPool();
+    const isPremium = await hasActivePremium(pool, request.user.userId);
     const result = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
       SELECT TOP 20 pa.AttemptId, pt.Grade, pa.Score, pa.AbilitySummary, pa.SubmittedAt
       FROM [mk].[PlacementAttempt] pa
@@ -840,7 +880,7 @@ app.get("/api/students/me/assessment/history", authenticate, async (request, res
         grade: Number(attempt.Grade),
         score: Number(attempt.Score),
         submittedAt: attempt.SubmittedAt,
-        summary: summary.advice?.summary || "Đã hoàn thành bài đánh giá.",
+        summary: isPremium ? (summary.advice?.summary || "Đã hoàn thành bài đánh giá.") : "Đã hoàn thành bài đánh giá.",
       };
     }) });
   } catch (error) {
@@ -1104,6 +1144,7 @@ app.get("/api/students/me/weekly-assessment", authenticate, async (request, resp
   try {
     await ensureWeeklyAssessmentSchema();
     const pool = await getPool();
+    if (!await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "weekly_assessment");
     const weekStart = vietnamWeekStartKey();
     const studentResult = await pool.request().input("studentId", sql.Int, request.user.userId)
       .query("SELECT Grade FROM [mk].[Student] WHERE StudentId = @studentId");
@@ -1177,6 +1218,7 @@ app.post("/api/students/me/weekly-assessment/start", authenticate, async (reques
   try {
     await ensureWeeklyAssessmentSchema();
     const pool = await getPool();
+    if (!await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "weekly_assessment");
     const weekStart = vietnamWeekStartKey();
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -1246,6 +1288,7 @@ app.post("/api/students/me/weekly-assessment/:attemptId/submit", authenticate, a
   try {
     await ensureWeeklyAssessmentSchema();
     const pool = await getPool();
+    if (!await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "weekly_assessment");
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const attemptResult = await transaction.request().input("attemptId", sql.BigInt, attemptId).input("studentId", sql.Int, request.user.userId)
@@ -1291,6 +1334,7 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
     await ensureLearningPathSchema();
     await ensureWeeklyAssessmentSchema();
     const pool = await getPool();
+    const isPremium = await hasActivePremium(pool, request.user.userId);
     const result = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
       SELECT s.Grade, l.LessonId, l.Title, l.Introduction, l.KeyConcept, l.WorkedExample, l.SortOrder,
              t.TopicId, t.TopicCode, t.Name AS TopicName,
@@ -1327,15 +1371,15 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       };
     });
     const studentGrade = Number(result.recordset[0]?.Grade || 0);
-    const weeklyLevelResult = await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
+    const weeklyLevelResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
       SELECT TOP 1 Difficulty, Score FROM [mk].[WeeklyAssessmentAttempt]
       WHERE StudentId = @studentId AND Grade = @grade AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC
-    `);
+    `) : { recordset: [] };
     const weeklyLevel = weeklyLevelResult.recordset[0];
     const recommendedDifficulty = !weeklyLevel ? 1
       : Number(weeklyLevel.Score) >= 80 ? Math.min(3, Number(weeklyLevel.Difficulty) + 1)
         : Number(weeklyLevel.Score) < 50 ? Math.max(1, Number(weeklyLevel.Difficulty) - 1) : Number(weeklyLevel.Difficulty);
-    const weeklyTopicResult = await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
+    const weeklyTopicResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
       WITH LatestAttempt AS (
         SELECT TOP 1 AttemptId FROM [mk].[WeeklyAssessmentAttempt]
         WHERE StudentId = @studentId AND Grade = @grade AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC
@@ -1346,16 +1390,16 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       INNER JOIN [mk].[WeeklyAssessmentQuestion] wq ON wq.AttemptId = a.AttemptId
       INNER JOIN [mk].[Questions] q ON q.QuestionId = wq.QuestionId
       GROUP BY q.TopicId
-    `);
+    `) : { recordset: [] };
     const weeklyTopicAccuracy = new Map(weeklyTopicResult.recordset.map((item) => [
       Number(item.TopicId), Math.round((Number(item.CorrectCount || 0) / Number(item.AnsweredCount || 1)) * 100),
     ]));
-    const placementResult = await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
+    const placementResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
       SELECT TOP 1 pa.AbilitySummary FROM [mk].[PlacementAttempt] pa
       INNER JOIN [mk].[PlacementTest] pt ON pt.PlacementTestId = pa.PlacementTestId
       WHERE pa.StudentId = @studentId AND pt.Grade = @grade AND pa.SubmittedAt IS NOT NULL
       ORDER BY pa.SubmittedAt DESC
-    `);
+    `) : { recordset: [] };
     let placementScores = new Map();
     try {
       const summary = JSON.parse(placementResult.recordset[0]?.AbilitySummary || "{}");
@@ -1378,7 +1422,7 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
         : relevantAccuracy < 50 ? "Cần củng cố theo kết quả đánh giá"
           : relevantAccuracy >= 80 ? "Đã vững · có thể thử mức cao hơn" : "Đang tiến bộ · tiếp tục luyện";
     }
-    const roadmapResult = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
+    const roadmapResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).query(`
       SELECT TOP 10 lp.GeneratedBy, lp.Reason, item.ItemOrder, topic.TopicCode, topic.TopicName,
              item.PlannedDate, item.Status
       FROM [mk].[LearningPath] lp
@@ -1386,7 +1430,7 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       LEFT JOIN [mk].[Topic] topic ON topic.TopicId = item.TopicId
       WHERE lp.StudentId = @studentId AND lp.Status = 'Active'
       ORDER BY item.ItemOrder, item.PlannedDate, item.LearningPathItemId
-    `);
+    `) : { recordset: [] };
     const topicAliases = {
       ARITHMETIC_ADD_SUB: ["addition", "subtraction", "decimals"],
       ARITHMETIC_MUL_DIV: ["multiplication", "division", "fractions", "addition", "subtraction"],
@@ -1419,12 +1463,14 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
     const latestRoadmap = roadmapResult.recordset[0];
     return response.json({
       grade: Number(result.recordset[0]?.Grade || 0),
+      isPremium,
+      premiumRequired: !isPremium,
       recommendedDifficulty,
       difficultyLabel: ["", "Cơ bản", "Trung bình", "Nâng cao"][recommendedDifficulty],
       lessons,
       completedCount: lessons.filter((lesson) => lesson.isCompleted).length,
       recommendedLessonId: recommended?.lessonId || null,
-      generatedBy: latestRoadmap?.GeneratedBy || "Adaptive",
+      generatedBy: latestRoadmap?.GeneratedBy || (isPremium ? "Adaptive" : "System"),
       roadmapReason: latestRoadmap?.Reason || "",
       recommendation: recommended
         ? recommended.weeklyAccuracy !== null && recommended.weeklyAccuracy < 50
@@ -1538,11 +1584,14 @@ app.get("/api/questions", authenticate, async (request, response) => {
     if (topic !== null && (!topic || topic.length > 50 || !/^[a-z0-9-]+$/.test(topic))) {
       return response.status(400).json({ message: "topic chỉ được chứa chữ thường, số và dấu gạch ngang." });
     }
+    const activity = request.query.activity === "game" ? "Game" : "Practice";
     const rawDifficulty = request.query.difficulty;
     const difficulty = rawDifficulty === undefined ? null : Number(rawDifficulty);
     if (difficulty !== null && (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 3)) {
       return response.status(400).json({ message: "difficulty phải là 1 (Easy), 2 (Medium) hoặc 3 (Hard)." });
     }
+    if (difficulty > 1 && activity !== "Game" && !await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "advanced_practice");
+    const effectiveDifficulty = activity === "Game" ? difficulty : difficulty ?? 1;
     const rawCount = request.query.count;
     const count = rawCount === undefined ? 10 : Number(rawCount);
     if (!Number.isInteger(count) || count < 1 || count > 50) return response.status(400).json({ message: "count phải là số nguyên từ 1 đến 50." });
@@ -1550,7 +1599,7 @@ app.get("/api/questions", authenticate, async (request, response) => {
     const result = await pool.request()
       .input("grade", sql.TinyInt, grade)
       .input("topic", sql.VarChar(50), topic)
-      .input("difficulty", sql.TinyInt, difficulty)
+      .input("difficulty", sql.TinyInt, effectiveDifficulty)
       .input("count", sql.Int, count)
       .query(`SELECT TOP (@count) q.QuestionId, t.GradeId, t.TopicCode, t.Name AS TopicName,
                      q.QuestionText, q.OptionA, q.OptionB, q.OptionC, q.OptionD, q.Difficulty
@@ -1591,6 +1640,7 @@ app.get("/api/questions/:id", authenticate, async (request, response) => {
     `);
     const row = result.recordset[0];
     if (!row) return response.status(404).json({ message: "Không tìm thấy câu hỏi đang hoạt động." });
+    if (Number(row.Difficulty) > 1 && request.query.activity !== "game" && !await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "advanced_practice");
     return response.json({ question: {
       questionId: row.QuestionId, grade: Number(row.GradeId),
       topic: { code: row.TopicCode, name: row.TopicName }, questionText: row.QuestionText,
@@ -1625,13 +1675,26 @@ app.post("/api/questions/:id/answer", authenticate, async (request, response) =>
       return response.status(403).json({ message: "Chỉ học sinh mới có thể nộp câu trả lời." });
     }
     const questionResult = await transaction.request().input("questionId", sql.Int, questionId)
-      .query("SELECT CorrectAnswer, Explanation FROM [mk].[Questions] WITH (UPDLOCK, HOLDLOCK) WHERE QuestionId = @questionId AND IsActive = 1");
+      .query("SELECT CorrectAnswer, Explanation, OptionA, OptionB, OptionC, OptionD, Difficulty FROM [mk].[Questions] WITH (UPDLOCK, HOLDLOCK) WHERE QuestionId = @questionId AND IsActive = 1");
     const question = questionResult.recordset[0];
     if (!question) {
       await transaction.rollback();
       return response.status(404).json({ message: "Không tìm thấy câu hỏi đang hoạt động." });
     }
+    if (Number(question.Difficulty) > 1 && activityType !== "Game" && !await hasActivePremium(pool, request.user.userId)) {
+      await transaction.rollback();
+      return premiumRequired(response, "advanced_practice");
+    }
     const isCorrect = answer === question.CorrectAnswer;
+    const optionText = {
+      A: question.OptionA, B: question.OptionB, C: question.OptionC, D: question.OptionD,
+    };
+    const explanation = question.Explanation?.trim() || "Hãy đọc lại lý thuyết và làm phép tính từng bước để kiểm tra đáp án.";
+    const selectedOptionText = optionText[answer] ?? "";
+    const correctOptionText = optionText[question.CorrectAnswer] ?? "";
+    const feedback = isCorrect
+      ? `Cách làm: ${explanation}`
+      : `Em chọn ${answer}: “${selectedOptionText}”, nhưng đáp án này chưa đúng. Đáp án đúng là ${question.CorrectAnswer}: “${correctOptionText}”. Cách giải đúng: ${explanation}`;
     const result = await transaction.request()
       .input("studentId", sql.Int, request.user.userId)
       .input("questionId", sql.Int, questionId)
@@ -1647,7 +1710,7 @@ app.post("/api/questions/:id/answer", authenticate, async (request, response) =>
       resultId: result.recordset[0].ResultId,
       questionId, answer, isCorrect,
       correctAnswer: question.CorrectAnswer,
-      explanation: question.Explanation,
+      selectedOptionText, correctOptionText, explanation, feedback,
       createdAt: result.recordset[0].CreatedAt,
     });
   } catch (error) {

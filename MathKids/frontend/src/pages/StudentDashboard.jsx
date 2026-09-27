@@ -320,7 +320,7 @@ export default function StudentDashboard({ onLogout }) {
 
       <Link to="/danh-gia" className="assessment-invite"><span>🧠</span><div><strong>{student?.completedAssessments ? "Xem bản đồ kỹ năng & lộ trình học" : "Khám phá điểm mạnh toán học của bạn"}</strong><small>Bài đánh giá vui 10 câu, giúp chọn nội dung luyện tập phù hợp với lớp {student?.grade || 1}.</small></div><b> {student?.completedAssessments ? "Xem kết quả" : "Bắt đầu"} →</b></Link>
 
-      <Link to="/danh-gia-tuan" className="weekly-assessment-invite"><span>📈</span><div><strong>Kiểm tra năng lực tuần</strong><small>Đánh giá 10 câu để điều chỉnh độ khó bài luyện tập tuần tới.</small></div><b>Kiểm tra tuần này →</b></Link>
+      <Link to={student?.isPremium ? "/danh-gia-tuan" : "/premium"} className="weekly-assessment-invite"><span>{student?.isPremium ? "📈" : "🔒"}</span><div><strong>Kiểm tra năng lực tuần{!student?.isPremium && " · Premium"}</strong><small>{student?.isPremium ? "Đánh giá 10 câu để điều chỉnh độ khó bài luyện tập tuần tới." : "Nâng cấp Premium để mở đánh giá tuần và điều chỉnh lộ trình."}</small></div><b>{student?.isPremium ? "Kiểm tra tuần này →" : "Tìm hiểu Premium →"}</b></Link>
 
       <Link to="/kiem-tra-thang" className="monthly-assessment-invite"><span>🗓️</span><div><strong>Bài kiểm tra tháng</strong><small>Ôn tập kiến thức lớp {student?.grade || 1}, xem lại đáp án và nhận XP, sao.</small></div><b>Làm bài tháng này →</b></Link>
 
