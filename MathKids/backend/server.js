@@ -6,7 +6,8 @@ import { createHmac, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { getPool, sql } from "./db.js";
-import { authenticate, loginUser, loginWithGoogle, registerUser, requireAdmin, validateCredentials } from "./auth.js";
+import { authenticate, loginUser, loginWithGoogle, registerUser, requireAdmin, requireParent, validateCredentials } from "./auth.js";
+import bcrypt from "bcrypt";
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -212,6 +213,25 @@ async function ensureWeeklyAssessmentSchema() {
     await weeklyAssessmentSchemaPromise;
   } catch (error) {
     weeklyAssessmentSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+let parentModuleSchemaPromise;
+async function ensureParentModuleSchema() {
+  if (!parentModuleSchemaPromise) {
+    parentModuleSchemaPromise = getPool().then(async (pool) => {
+      const migration = await readFile(
+        fileURLToPath(new URL("./migrations/ParentModule.sql", import.meta.url)),
+        "utf8"
+      );
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await parentModuleSchemaPromise;
+  } catch (error) {
+    parentModuleSchemaPromise = undefined;
     throw error;
   }
 }
@@ -477,9 +497,11 @@ app.get("/api/health", async (_request, response) => {
 
 app.post("/api/auth/register", async (request, response) => {
   const body = request.body || {};
+  const allowedRoles = ["Student", "Parent"];
+  const role = allowedRoles.includes(body.role) ? body.role : "Student";
   const errors = validateCredentials(body, true);
   if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
-  try { return response.status(201).json(await registerUser(body)); }
+  try { return response.status(201).json(await registerUser({ ...body, role })); }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng ký thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
 
@@ -653,9 +675,17 @@ app.get("/api/payments/:invoice/status", authenticate, async (request, response)
 });
 
 app.post("/api/students/me/assessment/start", authenticate, async (request, response) => {
-  const gradeInput = Number(request.body?.grade);
-  if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5) return response.status(400).json({ message: "Lớp cần đánh giá phải từ 1 đến 5." });
+  let gradeInput = Number(request.body?.grade);
   const pool = await getPool();
+  if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5) {
+    // Tự lấy grade từ DB nếu client không truyền
+    const studentResult = await pool.request()
+      .input("userId", sql.Int, request.user.userId)
+      .query("SELECT Grade FROM [mk].[Student] WHERE StudentId = @userId");
+    gradeInput = studentResult.recordset[0]?.Grade ?? 0;
+    if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5)
+      return response.status(400).json({ message: "Lớp cần đánh giá phải từ 1 đến 5. Vui lòng cập nhật hồ sơ trước." });
+  }
   const transaction = new sql.Transaction(pool);
   try {
     const topicsResult = await pool.request().query("SELECT TopicId, TopicCode, TopicName FROM [mk].[Topic]");
@@ -2112,10 +2142,387 @@ app.patch("/api/students/me/profile", authenticate, async (request, response) =>
   }
 });
 
+
+// ──────────────────────────────────────────────────────────
+// INVITE CODE — Học sinh tạo mã chia sẻ với phụ huynh
+// ──────────────────────────────────────────────────────────
+app.get("/api/students/me/invite-code", authenticate, async (request, response) => {
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const studentResult = await pool.request()
+      .input("userId", sql.Int, request.user.userId)
+      .query("SELECT StudentId FROM [mk].[Student] WHERE StudentId = @userId");
+    if (!studentResult.recordset[0]) return response.status(403).json({ message: "Chỉ học sinh mới có thể tạo mã liên kết." });
+    const existing = await pool.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .query(`SELECT TOP 1 InviteCode, ExpiresAt FROM [mk].[ChildLinkInvite]
+              WHERE StudentId = @studentId AND IsUsed = 0 AND ExpiresAt > SYSUTCDATETIME()
+              ORDER BY CreatedAt DESC`);
+    if (existing.recordset[0]) {
+      return response.json({ inviteCode: existing.recordset[0].InviteCode, expiresAt: existing.recordset[0].ExpiresAt });
+    }
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = "MK" + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+      const check = await pool.request().input("code", sql.VarChar(10), candidate)
+        .query("SELECT 1 FROM [mk].[ChildLinkInvite] WHERE InviteCode = @code");
+      if (!check.recordset.length) { code = candidate; break; }
+    }
+    if (!code) return response.status(500).json({ message: "Không thể tạo mã liên kết. Vui lòng thử lại." });
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("code", sql.VarChar(10), code)
+      .input("expiresAt", sql.DateTime2, expiresAt)
+      .query("INSERT INTO [mk].[ChildLinkInvite] (StudentId, InviteCode, ExpiresAt) VALUES (@studentId, @code, @expiresAt)");
+    return response.json({ inviteCode: code, expiresAt });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tạo mã liên kết.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Danh sách con đã liên kết
+// ──────────────────────────────────────────────────────────
+app.get("/api/parents/me/children", authenticate, requireParent, async (request, response) => {
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const result = await pool.request()
+      .input("parentId", sql.Int, request.user.userId)
+      .query(`
+        SELECT u.UserId AS StudentId, u.DisplayName AS Name, s.Grade, s.AvatarUrl,
+               ISNULL(s.TotalXp,0) AS TotalXp, ISNULL(s.TotalStars,0) AS TotalStars, l.LinkedAt
+        FROM [mk].[ParentStudentLink] l
+        INNER JOIN [mk].[AppUser] u ON u.UserId = l.StudentId
+        INNER JOIN [mk].[Student] s ON s.StudentId = l.StudentId
+        WHERE l.ParentUserId = @parentId AND l.IsActive = 1 AND u.IsActive = 1
+        ORDER BY l.LinkedAt DESC
+      `);
+    return response.json({
+      children: result.recordset.map((r) => ({
+        studentId: r.StudentId, name: r.Name, grade: r.Grade,
+        avatarUrl: r.AvatarUrl || "", totalXp: Number(r.TotalXp),
+        totalStars: Number(r.TotalStars), linkedAt: r.LinkedAt,
+      })),
+    });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải danh sách con.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────
+// PARENT — Tạo tài khoản học sinh và tự động liên kết
+// ──────────────────────────────────────────────────────────
+app.post("/api/parents/me/children/create", authenticate, requireParent, async (request, response) => {
+  const { name, email, password, grade } = request.body || {};
+  if (!name?.trim()) return response.status(400).json({ message: "Vui lòng nhập tên học sinh." });
+  if (!email?.trim()) return response.status(400).json({ message: "Vui lòng nhập email học sinh." });
+  if (!password || password.length < 6) return response.status(400).json({ message: "Mật khẩu phải có ít nhất 6 ký tự." });
+  const validGrades = [1, 2, 3, 4, 5];
+  const studentGrade = validGrades.includes(Number(grade)) ? Number(grade) : 1;
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    // Kiểm tra giới hạn số con (tối đa 5 con mỗi phụ huynh)
+    const childCountResult = await pool.request()
+      .input("parentId", sql.Int, request.user.userId)
+      .query("SELECT COUNT(*) AS Cnt FROM [mk].[ParentStudentLink] WHERE ParentUserId=@parentId AND IsActive=1");
+    if (childCountResult.recordset[0].Cnt >= 5)
+      return response.status(409).json({ message: "Mỗi phụ huynh chỉ được liên kết tối đa 5 học sinh." });
+    // Tạo tài khoản học sinh
+    const passwordHash = await bcrypt.hash(password, 12);
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      const userResult = await transaction.request()
+        .input("email", sql.NVarChar(255), email.trim().toLowerCase())
+        .input("passwordHash", sql.NVarChar(500), passwordHash)
+        .input("displayName", sql.NVarChar(120), name.trim())
+        .input("userRole", sql.VarChar(20), "Student")
+        .query(`INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName, UserRole)
+                OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole
+                VALUES (@email, @passwordHash, @displayName, @userRole)`);
+      const newUser = userResult.recordset[0];
+      // Tạo bản ghi Student
+      await transaction.request()
+        .input("studentId", sql.Int, newUser.UserId)
+        .input("grade", sql.Int, studentGrade)
+        .query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, @grade)");
+      // Tự động liên kết phụ huynh - con
+      await transaction.request()
+        .input("parentId", sql.Int, request.user.userId)
+        .input("studentId", sql.Int, newUser.UserId)
+        .query("INSERT INTO [mk].[ParentStudentLink] (ParentUserId, StudentId) VALUES (@parentId, @studentId)");
+      await transaction.commit();
+      return response.status(201).json({
+        success: true,
+        child: { studentId: newUser.UserId, name: newUser.DisplayName, email: newUser.Email, grade: studentGrade },
+        message: "Đã tạo tài khoản học sinh và liên kết thành công.",
+      });
+    } catch (err) {
+      await transaction.rollback().catch(() => {});
+      throw err;
+    }
+  } catch (error) {
+    if (error.number === 2627 || error.number === 2601) return response.status(409).json({ message: "Email này đã được sử dụng bởi tài khoản khác." });
+    return response.status(500).json({ message: "Không thể tạo tài khoản học sinh.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Liên kết con bằng mã invite
+// ──────────────────────────────────────────────────────────
+app.post("/api/parents/me/children/link", authenticate, requireParent, async (request, response) => {
+  const inviteCode = typeof request.body?.inviteCode === "string" ? request.body.inviteCode.trim().toUpperCase() : "";
+  if (!inviteCode) return response.status(400).json({ message: "Vui lòng nhập mã liên kết của con." });
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const inviteResult = await pool.request()
+      .input("code", sql.VarChar(10), inviteCode)
+      .query(`SELECT TOP 1 i.InviteId, i.StudentId, u.DisplayName, s.Grade
+              FROM [mk].[ChildLinkInvite] i
+              INNER JOIN [mk].[Student] s ON s.StudentId = i.StudentId
+              INNER JOIN [mk].[AppUser] u ON u.UserId = i.StudentId
+              WHERE i.InviteCode = @code AND i.IsUsed = 0 AND i.ExpiresAt > SYSUTCDATETIME()`);
+    const invite = inviteResult.recordset[0];
+    if (!invite) return response.status(404).json({ message: "Mã liên kết không hợp lệ hoặc đã hết hạn." });
+    const parentCountResult = await pool.request()
+      .input("studentId", sql.Int, invite.StudentId)
+      .query("SELECT COUNT(*) AS Cnt FROM [mk].[ParentStudentLink] WHERE StudentId = @studentId AND IsActive = 1");
+    if (parentCountResult.recordset[0].Cnt >= 2)
+      return response.status(409).json({ message: "Học sinh này đã đạt giới hạn 2 phụ huynh liên kết." });
+    const existLink = await pool.request()
+      .input("parentId", sql.Int, request.user.userId)
+      .input("studentId", sql.Int, invite.StudentId)
+      .query("SELECT 1 FROM [mk].[ParentStudentLink] WHERE ParentUserId=@parentId AND StudentId=@studentId");
+    if (existLink.recordset.length)
+      return response.status(409).json({ message: "Bạn đã liên kết với học sinh này rồi." });
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      await transaction.request()
+        .input("parentId", sql.Int, request.user.userId)
+        .input("studentId", sql.Int, invite.StudentId)
+        .query("INSERT INTO [mk].[ParentStudentLink] (ParentUserId, StudentId) VALUES (@parentId, @studentId)");
+      await transaction.request()
+        .input("inviteId", sql.Int, invite.InviteId)
+        .query("UPDATE [mk].[ChildLinkInvite] SET IsUsed = 1 WHERE InviteId = @inviteId");
+      await transaction.commit();
+    } catch (err) { await transaction.rollback().catch(() => {}); throw err; }
+    return response.json({ success: true, child: { studentId: invite.StudentId, name: invite.DisplayName, grade: invite.Grade } });
+  } catch (error) {
+    if (error.number === 2627 || error.number === 2601) return response.status(409).json({ message: "Bạn đã liên kết với học sinh này rồi." });
+    return response.status(500).json({ message: "Không thể liên kết.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Hủy liên kết con
+// ──────────────────────────────────────────────────────────
+app.delete("/api/parents/me/children/:studentId", authenticate, requireParent, async (request, response) => {
+  const studentId = Number(request.params.studentId);
+  if (!Number.isInteger(studentId)) return response.status(400).json({ message: "studentId không hợp lệ." });
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const result = await pool.request()
+      .input("parentId", sql.Int, request.user.userId)
+      .input("studentId", sql.Int, studentId)
+      .query("UPDATE [mk].[ParentStudentLink] SET IsActive = 0 WHERE ParentUserId = @parentId AND StudentId = @studentId AND IsActive = 1");
+    if (!result.rowsAffected[0]) return response.status(404).json({ message: "Không tìm thấy liên kết này." });
+    return response.json({ success: true });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể hủy liên kết.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// Middleware: xác nhận phụ huynh sở hữu học sinh này
+async function requireLinkedChild(request, response, next) {
+  const studentId = Number(request.params.studentId);
+  if (!Number.isInteger(studentId)) return response.status(400).json({ message: "studentId không hợp lệ." });
+  try {
+    const pool = await getPool();
+    const linkResult = await pool.request()
+      .input("parentId", sql.Int, request.user.userId)
+      .input("studentId", sql.Int, studentId)
+      .query("SELECT 1 FROM [mk].[ParentStudentLink] WHERE ParentUserId=@parentId AND StudentId=@studentId AND IsActive=1");
+    if (!linkResult.recordset.length) return response.status(403).json({ message: "Bạn không có quyền xem thông tin học sinh này." });
+    request.linkedStudentId = studentId;
+    return next();
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể xác thực liên kết.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Báo cáo học tập (FR-13)
+// ──────────────────────────────────────────────────────────
+app.get("/api/parents/me/children/:studentId/report", authenticate, requireParent, requireLinkedChild, async (request, response) => {
+  const studentId = request.linkedStudentId;
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const [infoResult, summaryResult, topicsResult, weeklyResult, assessResult] = await Promise.all([
+      pool.request().input("studentId", sql.Int, studentId).query(`
+        SELECT u.DisplayName AS Name, s.Grade, ISNULL(s.TotalXp,0) AS TotalXp, ISNULL(s.TotalStars,0) AS TotalStars, s.AvatarUrl
+        FROM [mk].[AppUser] u INNER JOIN [mk].[Student] s ON s.StudentId = u.UserId WHERE u.UserId = @studentId`),
+      pool.request().input("studentId", sql.Int, studentId).query(`
+        SELECT
+          (SELECT COUNT(*) FROM [mk].[StudentLessonProgress] WHERE StudentId=@studentId AND IsCompleted=1) AS LessonsCompleted,
+          (SELECT COUNT(*) FROM [mk].[Lessons]) AS TotalLessons,
+          (SELECT COUNT(*) FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId) AS QuestionsAnswered,
+          (SELECT CAST(AVG(CAST(IsCorrect AS FLOAT))*100 AS DECIMAL(5,1)) FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId) AS CorrectRate,
+          (SELECT COUNT(DISTINCT CAST(CreatedAt AS DATE)) FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId AND CreatedAt >= DATEADD(day,-7,SYSUTCDATETIME())) AS StudyDaysThisWeek,
+          (SELECT COUNT(DISTINCT CAST(CreatedAt AS DATE)) FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId AND CreatedAt >= DATEADD(day,-30,SYSUTCDATETIME())) AS StudyDaysThisMonth`),
+      pool.request().input("studentId", sql.Int, studentId).query(`
+        SELECT TOP 5 t.Name AS TopicName,
+               CAST(AVG(CAST(r.IsCorrect AS FLOAT))*100 AS DECIMAL(5,1)) AS CorrectRate, COUNT(*) AS Total
+        FROM [mk].[StudentQuestionResults] r
+        INNER JOIN [mk].[Questions] q ON q.QuestionId = r.QuestionId
+        INNER JOIN [mk].[Topics] t ON t.TopicId = q.TopicId
+        WHERE r.StudentId = @studentId AND r.CreatedAt >= DATEADD(day,-30,SYSUTCDATETIME())
+        GROUP BY t.TopicId, t.Name HAVING COUNT(*) >= 3 ORDER BY CorrectRate ASC`),
+      pool.request().input("studentId", sql.Int, studentId).query(`
+        SELECT TOP 8
+          CAST(DATEADD(day,-(DATEPART(WEEKDAY,CreatedAt)+5)%7,CAST(CreatedAt AS DATE)) AS DATE) AS WeekStart,
+          COUNT(*) AS QuestionsAnswered,
+          CAST(AVG(CAST(IsCorrect AS FLOAT))*100 AS DECIMAL(5,1)) AS CorrectRate
+        FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId
+        GROUP BY CAST(DATEADD(day,-(DATEPART(WEEKDAY,CreatedAt)+5)%7,CAST(CreatedAt AS DATE)) AS DATE)
+        ORDER BY WeekStart DESC`),
+      pool.request().input("studentId", sql.Int, studentId).query(`
+        SELECT
+          (SELECT TOP 1 Score FROM [mk].[LearningPath] WHERE StudentId=@studentId ORDER BY GeneratedAt DESC) AS PlacementScore,
+          (SELECT TOP 1 GeneratedAt FROM [mk].[LearningPath] WHERE StudentId=@studentId ORDER BY GeneratedAt DESC) AS PlacementAt,
+          (SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyScore,
+          (SELECT TOP 1 SubmittedAt FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyAt,
+          (SELECT TOP 1 Score FROM [mk].[MonthlyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY TestMonth DESC) AS LastMonthlyScore,
+          (SELECT TOP 1 SubmittedAt FROM [mk].[MonthlyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY TestMonth DESC) AS LastMonthlyAt`),
+    ]);
+    const info = infoResult.recordset[0];
+    if (!info) return response.status(404).json({ message: "Không tìm thấy học sinh." });
+    const s = summaryResult.recordset[0];
+    const assess = assessResult.recordset[0];
+    const allTopics = topicsResult.recordset;
+    return response.json({
+      report: {
+        studentId, name: info.Name, grade: info.Grade, avatarUrl: info.AvatarUrl || "",
+        totalXp: Number(info.TotalXp), totalStars: Number(info.TotalStars),
+        summary: {
+          lessonsCompleted: Number(s.LessonsCompleted || 0), totalLessons: Number(s.TotalLessons || 0),
+          questionsAnswered: Number(s.QuestionsAnswered || 0), correctRate: Number(s.CorrectRate || 0),
+          studyDaysThisWeek: Number(s.StudyDaysThisWeek || 0), studyDaysThisMonth: Number(s.StudyDaysThisMonth || 0),
+        },
+        weakTopics: allTopics.filter((t) => Number(t.CorrectRate) < 70).map((t) => ({ topicName: t.TopicName, correctRate: Number(t.CorrectRate), total: Number(t.Total) })),
+        strongTopics: allTopics.filter((t) => Number(t.CorrectRate) >= 80).map((t) => ({ topicName: t.TopicName, correctRate: Number(t.CorrectRate) })),
+        weeklyProgress: weeklyResult.recordset.map((w) => ({ week: w.WeekStart, questionsAnswered: Number(w.QuestionsAnswered), correctRate: Number(w.CorrectRate) })),
+        assessments: {
+          placement: { score: assess.PlacementScore ?? null, completedAt: assess.PlacementAt ?? null },
+          lastWeekly: { score: assess.LastWeeklyScore ?? null, completedAt: assess.LastWeeklyAt ?? null },
+          lastMonthly: { score: assess.LastMonthlyScore ?? null, completedAt: assess.LastMonthlyAt ?? null },
+        },
+      },
+    });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải báo cáo học tập.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Cảnh báo học tập (FR-14)
+// ──────────────────────────────────────────────────────────
+app.get("/api/parents/me/children/:studentId/alerts", authenticate, requireParent, requireLinkedChild, async (request, response) => {
+  const studentId = request.linkedStudentId;
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const now = new Date();
+    const alerts = [];
+    const inactiveResult = await pool.request().input("studentId", sql.Int, studentId)
+      .query("SELECT MAX(CreatedAt) AS LastActive FROM [mk].[StudentQuestionResults] WHERE StudentId = @studentId");
+    const lastActive = inactiveResult.recordset[0]?.LastActive;
+    const daysSinceActive = lastActive ? Math.floor((now - new Date(lastActive)) / 86400000) : 999;
+    if (daysSinceActive >= 3) {
+      alerts.push({
+        type: "INACTIVE", icon: "⏰",
+        title: daysSinceActive >= 999 ? "Con chưa bắt đầu học" : `Con chưa học ${daysSinceActive} ngày liên tiếp`,
+        detail: daysSinceActive >= 999 ? "Hãy khuyến khích con làm bài kiểm tra đầu vào để bắt đầu lộ trình học." : `Con chưa đăng nhập học từ ${new Date(lastActive).toLocaleDateString("vi-VN")}.`,
+      });
+    }
+    const weakResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT TOP 3 t.Name AS TopicName,
+             CAST(AVG(CAST(r.IsCorrect AS FLOAT))*100 AS DECIMAL(5,1)) AS CorrectRate, COUNT(*) AS Total
+      FROM [mk].[StudentQuestionResults] r
+      INNER JOIN [mk].[Questions] q ON q.QuestionId = r.QuestionId
+      INNER JOIN [mk].[Topics] t ON t.TopicId = q.TopicId
+      WHERE r.StudentId = @studentId AND r.CreatedAt >= DATEADD(day,-7,SYSUTCDATETIME())
+      GROUP BY t.TopicId, t.Name HAVING COUNT(*) >= 5 AND AVG(CAST(r.IsCorrect AS FLOAT)) < 0.5
+      ORDER BY CorrectRate ASC`);
+    for (const topic of weakResult.recordset) {
+      alerts.push({ type: "WEAK_TOPIC", icon: "📉", title: `Con hay sai phần "${topic.TopicName}"`, detail: `Tỷ lệ đúng chỉ đạt ${topic.CorrectRate}% trong tuần qua (${topic.Total} câu).` });
+    }
+    const reviewResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt]
+      WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL AND Score < 60 ORDER BY WeekStart DESC`);
+    if (reviewResult.recordset[0]) {
+      alerts.push({ type: "NEEDS_REVIEW", icon: "📚", title: "Con cần ôn lại kiến thức", detail: `Điểm kiểm tra tuần gần nhất chỉ đạt ${reviewResult.recordset[0].Score}/100. Hãy khuyến khích con ôn lại bài cũ.` });
+    }
+    return response.json({ alerts, unreadCount: alerts.length });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải cảnh báo học tập.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// PARENT — Gợi ý hỗ trợ (FR-15)
+// ──────────────────────────────────────────────────────────
+app.get("/api/parents/me/children/:studentId/recommendations", authenticate, requireParent, requireLinkedChild, async (request, response) => {
+  const studentId = request.linkedStudentId;
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const recommendations = [];
+    const weakResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT TOP 3 t.Name AS TopicName, CAST(AVG(CAST(r.IsCorrect AS FLOAT))*100 AS DECIMAL(5,1)) AS CorrectRate
+      FROM [mk].[StudentQuestionResults] r
+      INNER JOIN [mk].[Questions] q ON q.QuestionId = r.QuestionId
+      INNER JOIN [mk].[Topics] t ON t.TopicId = q.TopicId
+      WHERE r.StudentId=@studentId AND r.CreatedAt >= DATEADD(day,-30,SYSUTCDATETIME())
+      GROUP BY t.TopicId, t.Name HAVING COUNT(*) >= 3 ORDER BY CorrectRate ASC`);
+    for (const topic of weakResult.recordset) {
+      recommendations.push({ icon: "📝", title: `Luyện thêm phần "${topic.TopicName}"`, detail: `Dành 10–15 phút mỗi ngày luyện tập chủ đề này để cải thiện từ ${topic.CorrectRate}% lên trên 80%.`, source: "System" });
+    }
+    const activityResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT COUNT(DISTINCT CAST(CreatedAt AS DATE)) AS ActiveDays
+      FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId AND CreatedAt >= DATEADD(day,-7,SYSUTCDATETIME())`);
+    const activeDays = Number(activityResult.recordset[0]?.ActiveDays || 0);
+    if (activeDays < 3) {
+      recommendations.push({ icon: "📅", title: "Khuyến khích con học đều đặn hơn", detail: `Con chỉ học ${activeDays} ngày trong tuần qua. Hãy đặt thời gian học cố định mỗi ngày khoảng 20–30 phút.`, source: "System" });
+    }
+    const scoreResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt]
+      WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC`);
+    const lastScore = scoreResult.recordset[0]?.Score;
+    if (lastScore != null && lastScore < 60) {
+      recommendations.push({ icon: "🔄", title: "Ôn lại kiến thức cơ bản", detail: "Điểm kiểm tra tuần còn thấp. Hãy cùng con xem lại phần bài học và làm lại các bài tập cơ bản.", source: "System" });
+    }
+    if (!recommendations.length) {
+      recommendations.push({ icon: "🌟", title: "Con đang tiến bộ tốt!", detail: "Hãy tiếp tục khuyến khích con duy trì thói quen học tập mỗi ngày và thử sức với các thử thách khó hơn.", source: "System" });
+    }
+    return response.json({ recommendations });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải gợi ý hỗ trợ.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
 app.use((_request, response) => response.status(404).json({ message: "Không tìm thấy API." }));
 app.listen(port, () => {
   console.log(`MathKids API đang chạy tại http://localhost:${port}`);
-  ensureDailyChallengeSchema().then(() => ensureLearningPathSchema()).then(() => ensureMonthlyAssessmentSchema()).then(() => ensureWeeklyAssessmentSchema())
-    .then(() => console.log("Đã sẵn sàng thử thách, phần thưởng, Question Bank, lộ trình học, bài kiểm tra tuần và tháng."))
+  ensureDailyChallengeSchema().then(() => ensureLearningPathSchema()).then(() => ensureMonthlyAssessmentSchema()).then(() => ensureWeeklyAssessmentSchema()).then(() => ensureParentModuleSchema())
+    .then(() => console.log("Đã sẵn sàng thử thách, phần thưởng, Question Bank, lộ trình học, bài kiểm tra tuần, tháng và module phụ huynh."))
     .catch((error) => console.error("Không thể chuẩn bị dữ liệu học tập:", error.message));
 });

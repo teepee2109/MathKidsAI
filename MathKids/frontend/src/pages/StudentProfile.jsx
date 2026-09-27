@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
+import { getMyInviteCode } from "../services/parentService";
 import "./StudentProfile.css";
 import "./StudentProfileAvatar.css";
 import "./StudentProfilePremium.css";
@@ -24,6 +25,30 @@ export default function StudentProfile() {
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [premiumStatus, setPremiumStatus] = useState({ loading: true, isPremium: Boolean(cachedUser?.isPremium), subscription: cachedUser?.premiumExpiresAt ? { expiresAt: cachedUser.premiumExpiresAt } : null, error: "", hasCachedStatus: typeof cachedUser?.isPremium === "boolean" });
+  const [inviteCode, setInviteCode] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  async function handleGetInviteCode() {
+    setInviteLoading(true); setInviteError("");
+    try {
+      const data = await getMyInviteCode();
+      setInviteCode(data);
+    } catch (err) {
+      setInviteError(err.message);
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  function copyInviteCode() {
+    if (!inviteCode?.inviteCode) return;
+    navigator.clipboard.writeText(inviteCode.inviteCode).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -219,6 +244,42 @@ export default function StudentProfile() {
         {saved && <div className="profile-message success" role="status">Đã lưu hồ sơ thành công. Dashboard đã được cập nhật.</div>}
         <div className="profile-actions"><Link to="/dashboard">Hủy</Link><button type="submit" disabled={saving}>{saving ? "Đang lưu…" : "Lưu thay đổi"}</button></div>
       </form>}
+
+      {/* ── Liên kết phụ huynh ── */}
+      <section className="invite-section">
+        <div className="invite-heading">
+          <span className="invite-icon">👨‍👩‍👧</span>
+          <div>
+            <small>KẾT NỐI GIA ĐÌNH</small>
+            <h2>Liên kết phụ huynh</h2>
+            <p>Tạo mã để phụ huynh có thể theo dõi tiến độ học tập của bạn.</p>
+          </div>
+        </div>
+        {!inviteCode ? (
+          <>
+            {inviteError && <div className="profile-message error" role="alert">{inviteError}</div>}
+            <button className="invite-btn" onClick={handleGetInviteCode} disabled={inviteLoading}>
+              {inviteLoading ? "Đang tạo mã..." : "🔗 Tạo mã liên kết phụ huynh"}
+            </button>
+          </>
+        ) : (
+          <div className="invite-result">
+            <div className="invite-code-display">
+              <span className="invite-code-text">{inviteCode.inviteCode}</span>
+              <button className="invite-copy-btn" onClick={copyInviteCode}>
+                {inviteCopied ? "✅ Đã sao chép!" : "📋 Sao chép"}
+              </button>
+            </div>
+            <p className="invite-expiry">
+              Hết hạn lúc: {new Date(inviteCode.expiresAt).toLocaleString("vi-VN")}
+            </p>
+            <p className="invite-hint">Chia sẻ mã này cho phụ huynh. Mã có hiệu lực trong 24 giờ.</p>
+            <button className="invite-btn-refresh" onClick={handleGetInviteCode} disabled={inviteLoading}>
+              ↻ Tạo mã mới
+            </button>
+          </div>
+        )}
+      </section>
     </section>
   </main>;
 }

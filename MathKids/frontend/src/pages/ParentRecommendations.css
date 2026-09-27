@@ -1,0 +1,15 @@
+.recs-title { font-size: 22px; margin: 0 0 8px; color: #1e293b; }
+.recs-subtitle { color: #64748b; font-size: 14px; margin: 0 0 24px; }
+
+.recs-list { display: flex; flex-direction: column; gap: 16px; }
+
+.rec-card { display: flex; gap: 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: box-shadow .2s; }
+.rec-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+
+.rec-icon { font-size: 34px; flex-shrink: 0; margin-top: 2px; }
+.rec-body strong { display: block; font-size: 16px; margin-bottom: 6px; color: #1e293b; }
+.rec-body p { margin: 0 0 12px; font-size: 14px; color: #64748b; line-height: 1.6; }
+
+.rec-source { font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px; display: inline-block; }
+.source-ai     { background: #f3e8ff; color: #7c3aed; }
+.source-system { background: #f1f5f9; color: #64748b; }
