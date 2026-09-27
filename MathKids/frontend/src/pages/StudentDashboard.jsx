@@ -289,7 +289,7 @@ export default function StudentDashboard({ onLogout }) {
   return <main className={`student-dashboard ${equippedReward === "space-theme" ? "reward-theme-space" : ""}`}>
     <header className="dashboard-header">
       <BrandLogo className="dashboard-brand" to="/dashboard" />
-      <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard">⌂ <span>Tổng quan</span></a><Link to="/hoc-tap">▣ <span>Học tập</span></Link><Link to="/tro-choi">🎮 <span>Trò chơi</span></Link><a href="#challenge">♜ <span>Thử thách</span></a></nav>
+      <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard">⌂ <span>Tổng quan</span></a><Link to="/hoc-tap">▣ <span>Học tập</span></Link><Link to="/tro-choi">🎮 <span>Trò chơi</span></Link><a href="#challenge">♜ <span>Thử thách</span></a><Link to="/lien-he">🎧 <span>Hỗ trợ</span></Link></nav>
       <div className="dashboard-account"><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedReward === "rainbow-frame" ? "reward-frame-rainbow" : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span></Link><button onClick={onLogout}>Đăng xuất</button></div>
     </header>
 
@@ -359,7 +359,7 @@ export default function StudentDashboard({ onLogout }) {
         </aside>
       </div>
 
-      <footer className="dashboard-footer"><span>🌱</span><strong>Mỗi ngày một chút tiến bộ!</strong><span>MathKids luôn đồng hành cùng bạn.</span></footer>
+      <footer className="dashboard-footer"><span>🌱</span><strong>Mỗi ngày một chút tiến bộ!</strong><span>MathKids luôn đồng hành cùng bạn. · <Link to="/lien-he" style={{ color: "inherit", fontWeight: 700 }}>Hỗ trợ khách hàng</Link></span></footer>
     </div>
   </main>;
 }

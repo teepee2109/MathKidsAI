@@ -23,6 +23,7 @@ export default function Landing() {
           <a href="#why">Vì sao MathKids?</a>
           <a href="#how">Cách hoạt động</a>
           <a href="#parents">Phụ huynh</a>
+          <Link to="/lien-he">Liên hệ</Link>
         </nav>
         <div className="landing-nav-actions">
           <Link className="landing-login" to="/dang-nhap">Đăng nhập</Link>
@@ -103,7 +104,7 @@ export default function Landing() {
         <div><Link className="landing-primary" to="/dang-ky">Tạo tài khoản miễn phí <span>→</span></Link><Link className="landing-cta-home" to="/home">Xem trang học tập</Link></div>
       </section>
 
-      <footer className="landing-footer"><BrandLogo className="landing-brand" to="/" /><p>Học Toán vui hơn, tiến bộ mỗi ngày.</p><div><Link to="/home">Trang chủ</Link><Link to="/dang-nhap">Đăng nhập</Link><Link to="/dang-ky">Đăng ký</Link></div><small>© 2026 MathKids</small></footer>
+      <footer className="landing-footer"><BrandLogo className="landing-brand" to="/" /><p>Học Toán vui hơn, tiến bộ mỗi ngày.</p><div><Link to="/home">Trang chủ</Link><Link to="/lien-he">Liên hệ & Hỗ trợ</Link><Link to="/dang-nhap">Đăng nhập</Link><Link to="/dang-ky">Đăng ký</Link></div><small>© 2026 MathKids</small></footer>
     </main>
   );
 }

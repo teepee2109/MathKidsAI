@@ -23,6 +23,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const navigate = useNavigate();
 
     const [mode, setMode] = useState(initialMode);
+    const [registerRole, setRegisterRole] = useState("Student");
     const [values, setValues] = useState(initialValues);
     const [showPassword, setShowPassword] = useState(false);
     const [remember, setRemember] = useState(true);
@@ -43,7 +44,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             if (!response.ok) throw new Error(data.message || "Đăng nhập Google thất bại.");
             saveAuthSession(data, true);
             onAuthenticated?.(data.user);
-            navigate(data.user.role === "Admin" ? "/admin/dashboard" : "/dashboard");
+            navigate(data.user.role === "Admin" ? "/admin/dashboard" : data.user.role === "Parent" ? "/parent/dashboard" : "/dashboard");
         } catch (googleError) {
             setError(googleError.message || "Đăng nhập Google thất bại.");
         } finally {
@@ -192,7 +193,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         email: values.email.trim(),
                         password: values.password,
                         confirmPassword:
-                            values.confirmPassword
+                            values.confirmPassword,
+                        role: registerRole,
                     }
                     : {
                         email: values.email.trim(),
@@ -208,13 +210,16 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 body: JSON.stringify(body)
             });
 
-            // Đọc response
-            const data = await response.json();
+            // Đọc response an toàn
+            const data = await response.json().catch(() => ({}));
 
-            // Nếu Backend trả lỗi
+            // Nếu Backend trả lỗi hoặc không kết nối được
             if (!response.ok) {
+                if (response.status === 502 || response.status === 504 || response.status === 503) {
+                    throw new Error("Không thể kết nối đến máy chủ Backend (Port 4000). Vui lòng kiểm tra xem Backend đã được khởi động chưa.");
+                }
                 throw new Error(
-                    data.message || "Có lỗi xảy ra."
+                    data.message || "Có lỗi xảy ra khi kết nối tới máy chủ."
                 );
             }
 
@@ -223,7 +228,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
             // Đăng nhập / đăng ký thành công
             onAuthenticated?.(data.user);
-            navigate(data.user.role === "Admin" ? "/admin/dashboard" : "/dashboard");
+            navigate(data.user.role === "Admin" ? "/admin/dashboard" : data.user.role === "Parent" ? "/parent/dashboard" : "/dashboard");
 
         } catch (error) {
             console.error("Auth error:", error);
@@ -425,6 +430,29 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                 )}
 
                             </label>
+                        )}
+
+                        {/* ROLE SELECTOR — chỉ hiện khi đăng ký */}
+                        {isRegister && (
+                            <div className="role-selector">
+                                <span>Bạn đăng ký với tư cách:</span>
+                                <div className="role-options">
+                                    <button
+                                        type="button"
+                                        className={`role-option ${registerRole === "Student" ? "active" : ""}`}
+                                        onClick={() => setRegisterRole("Student")}
+                                    >
+                                        🎒 Học sinh
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`role-option ${registerRole === "Parent" ? "active" : ""}`}
+                                        onClick={() => setRegisterRole("Parent")}
+                                    >
+                                        👨‍👩‍👧 Phụ huynh
+                                    </button>
+                                </div>
+                            </div>
                         )}
 
                         {/* EMAIL */}

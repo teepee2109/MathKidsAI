@@ -108,7 +108,8 @@ export function validateCredentials(
 export async function registerUser({
     name,
     email,
-    password
+    password,
+    role = "Student"
 }) {
     const pool = await getPool();
 
@@ -155,12 +156,19 @@ export async function registerUser({
                     name.trim()
                 )
 
+                .input(
+                    "userRole",
+                    sql.VarChar(20),
+                    role
+                )
+
                 .query(`
                     INSERT INTO [mk].[AppUser]
                     (
                         Email,
                         PasswordHash,
-                        DisplayName
+                        DisplayName,
+                        UserRole
                     )
 
                     OUTPUT
@@ -173,7 +181,8 @@ export async function registerUser({
                     (
                         @email,
                         @passwordHash,
-                        @displayName
+                        @displayName,
+                        @userRole
                     )
                 `);
 
@@ -186,28 +195,30 @@ export async function registerUser({
         // CREATE STUDENT
         // ==============================
 
-        await transaction
-            .request()
+        if (role === "Student") {
+            await transaction
+                .request()
 
-            .input(
-                "studentId",
-                sql.Int,
-                user.UserId
-            )
-
-            .query(`
-                INSERT INTO [mk].[Student]
-                (
-                    StudentId,
-                    Grade
+                .input(
+                    "studentId",
+                    sql.Int,
+                    user.UserId
                 )
 
-                VALUES
-                (
-                    @studentId,
-                    1
-                )
-            `);
+                .query(`
+                    INSERT INTO [mk].[Student]
+                    (
+                        StudentId,
+                        Grade
+                    )
+
+                    VALUES
+                    (
+                        @studentId,
+                        1
+                    )
+                `);
+        }
 
 
         // ==============================
@@ -456,5 +467,25 @@ export async function requireAdmin(request, response, next) {
         return next();
     } catch (error) {
         return response.status(500).json({ message: "Không thể xác thực quyền quản trị.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+    }
+}
+
+export async function requireParent(request, response, next) {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("userId", sql.Int, request.user.userId)
+            .query("SELECT UserRole, IsActive FROM [mk].[AppUser] WHERE UserId = @userId");
+        const currentUser = result.recordset[0];
+        if (!currentUser || !currentUser.IsActive) {
+            return response.status(401).json({ message: "Tài khoản không còn hoạt động." });
+        }
+        if (currentUser.UserRole !== "Parent") {
+            return response.status(403).json({ message: "Chỉ phụ huynh mới có quyền truy cập chức năng này." });
+        }
+        request.user.role = currentUser.UserRole;
+        return next();
+    } catch (error) {
+        return response.status(500).json({ message: "Không thể xác thực quyền phụ huynh.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
     }
 }
