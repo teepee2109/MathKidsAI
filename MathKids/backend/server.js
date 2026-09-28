@@ -16,6 +16,7 @@ const questionBankMigrationPath = fileURLToPath(new URL("./migrations/QuestionBa
 const learningPathMigrationPath = fileURLToPath(new URL("./migrations/LearningPath.sql", import.meta.url));
 const monthlyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/MonthlyAssessment.sql", import.meta.url));
 const weeklyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/WeeklyAssessment.sql", import.meta.url));
+const parentModuleMigrationPath = fileURLToPath(new URL("./migrations/ParentModule.sql", import.meta.url));
 const premiumPrice = 99000;
 const premiumDays = 30;
 const sepayCheckoutUrl = process.env.SEPAY_ENVIRONMENT === "production" ? "https://pay.sepay.vn/v1/checkout/init" : "https://pay-sandbox.sepay.vn/v1/checkout/init";
@@ -27,6 +28,7 @@ let questionBankSchemaPromise;
 let learningPathSchemaPromise;
 let monthlyAssessmentSchemaPromise;
 let weeklyAssessmentSchemaPromise;
+let parentModuleSchemaPromise;
 
 const rewardCatalog = [
   { code: "rainbow-frame", category: "frame", name: "Khung cầu vồng", icon: "🌈", description: "Trang trí avatar bằng viền cầu vồng.", cost: 5 },
@@ -215,6 +217,44 @@ async function ensureWeeklyAssessmentSchema() {
     weeklyAssessmentSchemaPromise = undefined;
     throw error;
   }
+}
+
+async function ensureParentModuleSchema() {
+  if (!parentModuleSchemaPromise) {
+    parentModuleSchemaPromise = getPool().then(async (pool) => {
+      const migration = await readFile(parentModuleMigrationPath, "utf8");
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await parentModuleSchemaPromise;
+  } catch (error) {
+    parentModuleSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+async function hasActivePremium(pool, userId) {
+  try {
+    const result = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT TOP 1 SubscriptionId
+        FROM [mk].[PremiumSubscription]
+        WHERE UserId = @userId AND Status = 'Active' AND ExpiresAt > SYSUTCDATETIME()
+      `);
+    return Boolean(result.recordset && result.recordset.length > 0);
+  } catch {
+    return false;
+  }
+}
+
+function premiumRequired(response, feature = "") {
+  return response.status(403).json({
+    code: "PREMIUM_REQUIRED",
+    message: "Tính năng này chỉ dành cho tài khoản Premium.",
+    feature,
+  });
 }
 
 function signSePayFields(fields) {
