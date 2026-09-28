@@ -243,8 +243,8 @@ async function ensureWeeklyAssessmentSchema() {
 
 async function ensureParentModuleSchema() {
   if (!parentModuleSchemaPromise) {
-    parentModuleSchemaPromise = ensureQuestionBankSchema().then(async () => {
-      const pool = await getPool();
+parentModuleSchemaPromise = ensureQuestionBankSchema().then(async () => {
+  const pool = await getPool();
       const migration = await readFile(parentModuleMigrationPath, "utf8");
       await pool.request().query(migration);
     });
@@ -264,6 +264,7 @@ async function ensureEmailOtpSchema() {
       await pool.request().query(migration);
     });
   }
+
   try {
     await emailOtpSchemaPromise;
   } catch (error) {
@@ -279,6 +280,7 @@ async function ensurePasswordResetOtpSchema() {
       await pool.request().query(migration);
     });
   }
+
   try {
     await passwordResetOtpSchemaPromise;
   } catch (error) {
@@ -288,8 +290,41 @@ async function ensurePasswordResetOtpSchema() {
 }
 
 function hashRegistrationOtp(email, code, purpose = "register") {
-  const secret = process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || "mathkids-development-secret-change-me";
-  return createHmac("sha256", secret).update(`${purpose}:${email}:${code}`).digest("hex");
+  const secret =
+    process.env.OTP_HASH_SECRET ||
+    process.env.JWT_SECRET ||
+    "mathkids-development-secret-change-me";
+
+  return createHmac("sha256", secret)
+    .update(`${purpose}:${email}:${code}`)
+    .digest("hex");
+}
+
+async function hasActivePremium(pool, userId) {
+  try {
+    const result = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT TOP 1 SubscriptionId
+        FROM [mk].[PremiumSubscription]
+        WHERE UserId = @userId
+          AND Status = 'Active'
+          AND ExpiresAt > SYSUTCDATETIME()
+      `);
+
+    return Boolean(result.recordset && result.recordset.length > 0);
+  } catch {
+    return false;
+  }
+}
+
+function premiumRequired(response, feature = "") {
+  return response.status(403).json({
+    code: "PREMIUM_REQUIRED",
+    message: "Tính năng này chỉ dành cho tài khoản Premium.",
+    feature,
+  });
+}
 }
 
 function signSePayFields(fields) {
