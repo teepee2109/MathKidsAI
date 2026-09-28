@@ -13,6 +13,7 @@ import "./StudentLeaderboard.css";
 import "./StudentPremiumInvite.css";
 import "./StudentDashboardLessons.css";
 import "./StudentDailyChallenge.css";
+import "./StudentDashboardRewards.css";
 
 const badgeMilestones = [
   { name: "Bước đầu tiên", icon: "🌱", xp: 50 },
@@ -49,7 +50,22 @@ export default function StudentDashboard({ onLogout }) {
   const totalXp = Number(student?.totalXp || 0);
   const currentLevel = Math.floor(totalXp / 100) + 1;
   const levelProgress = totalXp % 100;
-  const equippedReward = student?.equippedReward || "";
+  const equippedRewards = student?.equippedRewards || (student?.equippedReward ? [student.equippedReward] : []);
+  const equippedFrame = equippedRewards.find((code) => ["rainbow-frame", "sunset-frame", "starlight-frame"].includes(code)) || "";
+  const equippedCompanion = equippedRewards.find((code) => ["fox-companion", "owl-companion", "dino-companion"].includes(code)) || "";
+  const equippedTheme = equippedRewards.find((code) => ["space-theme", "ocean-theme", "forest-theme"].includes(code)) || "";
+  const companionIcon = { "fox-companion": "🦊", "owl-companion": "🦉", "dino-companion": "🦖" }[equippedCompanion] || "🤖";
+  const rewardLabels = {
+    "rainbow-frame": "🌈 Khung cầu vồng đang trang trí ảnh đại diện",
+    "sunset-frame": "🌅 Khung hoàng hôn đang trang trí ảnh đại diện",
+    "starlight-frame": "✨ Khung ánh sao đang trang trí ảnh đại diện",
+    "fox-companion": "🦊 Cáo đồng hành đang cổ vũ bạn",
+    "owl-companion": "🦉 Cú mèo ham học đang đồng hành cùng bạn",
+    "dino-companion": "🦖 Khủng long tí hon đang cổ vũ bạn",
+    "space-theme": "🚀 Chủ đề vũ trụ đã được bật",
+    "ocean-theme": "🌊 Chủ đề đại dương đã được bật",
+    "forest-theme": "🌳 Chủ đề khu rừng đã được bật",
+  };
   const learningCards = learningPath?.lessons
     ? [...learningPath.lessons].sort((a, b) => {
       if (a.lessonId === learningPath.recommendedLessonId) return -1;
@@ -286,17 +302,17 @@ export default function StudentDashboard({ onLogout }) {
     loadDashboard();
   }
 
-  return <main className={`student-dashboard ${equippedReward === "space-theme" ? "reward-theme-space" : ""}`}>
+  return <main className={`student-dashboard ${equippedTheme ? `reward-theme-${equippedTheme.replace("-theme", "")}` : ""}`}>
     <header className="dashboard-header">
       <BrandLogo className="dashboard-brand" to="/dashboard" />
       <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard">⌂ <span>Tổng quan</span></a><Link to="/hoc-tap">▣ <span>Học tập</span></Link><Link to="/tro-choi">🎮 <span>Trò chơi</span></Link><a href="#challenge">♜ <span>Thử thách</span></a><Link to="/lien-he">🎧 <span>Hỗ trợ</span></Link></nav>
-      <div className="dashboard-account"><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedReward === "rainbow-frame" ? "reward-frame-rainbow" : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span></Link><button onClick={onLogout}>Đăng xuất</button></div>
+      <div className="dashboard-account"><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedFrame ? `reward-frame-${equippedFrame.replace("-frame", "")}` : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span></Link><button onClick={onLogout}>Đăng xuất</button></div>
     </header>
 
     <div className="dashboard-content" id="dashboard">
       <section className="welcome-banner">
-        <div className="welcome-copy"><span className="welcome-tag">✦ KHU VỰC HỌC TẬP CỦA BẠN</span><h1>Chào {student?.name?.split(" ").at(-1) || "bạn nhỏ"}! 👋 {equippedReward === "fox-companion" && <span className="equipped-companion" title="Cáo đồng hành">🦊</span>}</h1><p>Sẵn sàng khám phá thêm điều mới hôm nay chưa?</p><Link to="/hoc-tap" className="welcome-cta">Tiếp tục học <span>→</span></Link></div>
-        <div className="welcome-art" aria-hidden="true"><span className="welcome-sun">☀</span><span className="welcome-mascot">🦊</span><span className="welcome-book">1&nbsp; 2&nbsp; 3</span></div>
+        <div className="welcome-copy"><span className="welcome-tag">✦ KHU VỰC HỌC TẬP CỦA BẠN</span><h1>Chào {student?.name?.split(" ").at(-1) || "bạn nhỏ"}! 👋</h1><p>Sẵn sàng khám phá thêm điều mới hôm nay chưa?</p>{equippedRewards.length > 0 && <div className="equipped-reward-labels" role="status">{equippedRewards.map((code) => <span className="equipped-reward-label" key={code}>{rewardLabels[code]}</span>)}</div>}<Link to="/hoc-tap" className="welcome-cta">Tiếp tục học <span>→</span></Link></div>
+        <div className="welcome-art" aria-hidden="true"><span className="welcome-sun">☀</span><span className="welcome-mascot">{companionIcon}</span><span className="welcome-book">1&nbsp; 2&nbsp; 3</span></div>
       </section>
 
       {error && <div className="dashboard-error" role="alert"><span>{error}</span><button onClick={retryDashboard}>Thử lại</button></div>}

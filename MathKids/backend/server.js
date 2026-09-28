@@ -2,11 +2,12 @@ import express from "express";
 import cors from "cors";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { getPool, sql } from "./db.js";
 import { authenticate, loginUser, loginWithGoogle, registerUser, requireAdmin, requireParent, validateCredentials } from "./auth.js";
+import { sendPasswordResetOtpEmail, sendRegistrationOtpEmail } from "./emailService.js";
 import bcrypt from "bcrypt";
 
 const app = express();
@@ -16,6 +17,9 @@ const questionBankMigrationPath = fileURLToPath(new URL("./migrations/QuestionBa
 const learningPathMigrationPath = fileURLToPath(new URL("./migrations/LearningPath.sql", import.meta.url));
 const monthlyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/MonthlyAssessment.sql", import.meta.url));
 const weeklyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/WeeklyAssessment.sql", import.meta.url));
+const parentModuleMigrationPath = fileURLToPath(new URL("./migrations/ParentModule.sql", import.meta.url));
+const emailOtpMigrationPath = fileURLToPath(new URL("./migrations/EmailRegistrationOtp.sql", import.meta.url));
+const passwordResetOtpMigrationPath = fileURLToPath(new URL("./migrations/EmailPasswordResetOtp.sql", import.meta.url));
 const premiumPrice = 99000;
 const premiumDays = 30;
 const sepayCheckoutUrl = process.env.SEPAY_ENVIRONMENT === "production" ? "https://pay.sepay.vn/v1/checkout/init" : "https://pay-sandbox.sepay.vn/v1/checkout/init";
@@ -27,18 +31,27 @@ let questionBankSchemaPromise;
 let learningPathSchemaPromise;
 let monthlyAssessmentSchemaPromise;
 let weeklyAssessmentSchemaPromise;
+let parentModuleSchemaPromise;
+let emailOtpSchemaPromise;
+let passwordResetOtpSchemaPromise;
 
 const rewardCatalog = [
   { code: "rainbow-frame", category: "frame", name: "Khung cầu vồng", icon: "🌈", description: "Trang trí avatar bằng viền cầu vồng.", cost: 5 },
+  { code: "sunset-frame", category: "frame", name: "Khung hoàng hôn", icon: "🌅", description: "Viền avatar chuyển sắc vàng cam ấm áp.", cost: 8 },
+  { code: "starlight-frame", category: "frame", name: "Khung ánh sao", icon: "✨", description: "Thêm viền xanh tím lấp lánh quanh avatar.", cost: 10 },
   { code: "fox-companion", category: "companion", name: "Cáo đồng hành", icon: "🦊", description: "Một người bạn nhỏ cổ vũ trên dashboard.", cost: 10 },
+  { code: "owl-companion", category: "companion", name: "Cú mèo ham học", icon: "🦉", description: "Cú mèo thông thái xuất hiện ở góc học tập.", cost: 12 },
+  { code: "dino-companion", category: "companion", name: "Khủng long tí hon", icon: "🦖", description: "Bạn khủng long vui nhộn đồng hành cùng em.", cost: 15 },
   { code: "space-theme", category: "theme", name: "Chủ đề vũ trụ", icon: "🚀", description: "Đổi dashboard sang phong cách không gian.", cost: 15 },
+  { code: "ocean-theme", category: "theme", name: "Đại dương xanh", icon: "🌊", description: "Phủ dashboard sắc xanh biển dịu mắt.", cost: 18 },
+  { code: "forest-theme", category: "theme", name: "Khu rừng kỳ thú", icon: "🌳", description: "Đổi dashboard thành khu rừng xanh tươi.", cost: 20 },
 ];
 
 const xpBadges = [
-  { code: "first-steps", name: "Bước đầu tiên", icon: "🌱", threshold: 50, description: "Tích lũy 50 XP" },
-  { code: "explorer", name: "Nhà khám phá", icon: "🧭", threshold: 150, description: "Tích lũy 150 XP" },
-  { code: "math-star", name: "Siêu sao Toán", icon: "🌟", threshold: 500, description: "Tích lũy 500 XP" },
-  { code: "math-legend", name: "Huyền thoại Toán", icon: "🏆", threshold: 1000, description: "Tích lũy 1.000 XP" },
+  { code: "first-steps", name: "Bước đầu tiên", icon: "🌱", threshold: 50, starsReward: 2, description: "Tích lũy 50 XP" },
+  { code: "explorer", name: "Nhà khám phá", icon: "🧭", threshold: 150, starsReward: 4, description: "Tích lũy 150 XP" },
+  { code: "math-star", name: "Siêu sao Toán", icon: "🌟", threshold: 500, starsReward: 8, description: "Tích lũy 500 XP" },
+  { code: "math-legend", name: "Huyền thoại Toán", icon: "🏆", threshold: 1000, starsReward: 15, description: "Tích lũy 1.000 XP" },
 ];
 
 const dailyChallengeBank = {
@@ -144,6 +157,17 @@ async function ensureDailyChallengeSchema() {
           CONSTRAINT FK_StudentRewardClaim_Student FOREIGN KEY (StudentId) REFERENCES [mk].[Student](StudentId)
         );
       END
+      IF OBJECT_ID(N'[mk].[StudentBadgeAward]', N'U') IS NULL
+      BEGIN
+        CREATE TABLE [mk].[StudentBadgeAward] (
+          StudentId INT NOT NULL,
+          BadgeCode NVARCHAR(40) NOT NULL,
+          StarsAwarded INT NOT NULL,
+          AwardedAt DATETIME2 NOT NULL CONSTRAINT DF_StudentBadgeAward_AwardedAt DEFAULT (SYSUTCDATETIME()),
+          CONSTRAINT PK_StudentBadgeAward PRIMARY KEY (StudentId, BadgeCode),
+          CONSTRAINT FK_StudentBadgeAward_Student FOREIGN KEY (StudentId) REFERENCES [mk].[Student](StudentId)
+        );
+      END
     `));
   }
   try {
@@ -217,10 +241,86 @@ async function ensureWeeklyAssessmentSchema() {
   }
 }
 
+async function ensureParentModuleSchema() {
+  if (!parentModuleSchemaPromise) {
+    parentModuleSchemaPromise = ensureQuestionBankSchema().then(async () => {
+      const pool = await getPool();
+      const migration = await readFile(parentModuleMigrationPath, "utf8");
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await parentModuleSchemaPromise;
+  } catch (error) {
+    parentModuleSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+async function ensureEmailOtpSchema() {
+  if (!emailOtpSchemaPromise) {
+    emailOtpSchemaPromise = getPool().then(async (pool) => {
+      const migration = await readFile(emailOtpMigrationPath, "utf8");
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await emailOtpSchemaPromise;
+  } catch (error) {
+    emailOtpSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+async function ensurePasswordResetOtpSchema() {
+  if (!passwordResetOtpSchemaPromise) {
+    passwordResetOtpSchemaPromise = getPool().then(async (pool) => {
+      const migration = await readFile(passwordResetOtpMigrationPath, "utf8");
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await passwordResetOtpSchemaPromise;
+  } catch (error) {
+    passwordResetOtpSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+function hashRegistrationOtp(email, code, purpose = "register") {
+  const secret = process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || "mathkids-development-secret-change-me";
+  return createHmac("sha256", secret).update(`${purpose}:${email}:${code}`).digest("hex");
+}
+
 function signSePayFields(fields) {
   const signedFields = ["order_amount", "merchant", "currency", "operation", "order_description", "order_invoice_number", "customer_id", "payment_method", "success_url", "error_url", "cancel_url"];
   const signedString = signedFields.filter((field) => fields[field] !== undefined && fields[field] !== null && fields[field] !== "").map((field) => `${field}=${fields[field]}`).join(",");
   return createHmac("sha256", process.env.SEPAY_SECRET_KEY || "").update(signedString).digest("base64");
+}
+
+async function hasActivePremium(pool, userId) {
+  const result = await pool.request()
+    .input("userId", sql.Int, userId)
+    .query(`SELECT TOP 1 1 AS IsPremium
+            FROM [mk].[PremiumSubscription]
+            WHERE UserId = @userId
+              AND Status = 'Active'
+              AND ExpiresAt > SYSUTCDATETIME()
+            ORDER BY ExpiresAt DESC`);
+  return result.recordset.length > 0;
+}
+
+function premiumRequired(response, feature) {
+  const featureNames = {
+    weekly_assessment: "bài kiểm tra năng lực tuần",
+    advanced_practice: "bài luyện tập nâng cao",
+    parent_report: "báo cáo học tập chi tiết và gợi ý hỗ trợ cho phụ huynh",
+  };
+  const featureName = featureNames[feature] || "tính năng này";
+  return response.status(403).json({
+    code: "PREMIUM_REQUIRED",
+    message: `${featureName} dành cho tài khoản Premium. Vui lòng nâng cấp để tiếp tục.`,
+  });
 }
 
 async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactionId = "") {
@@ -238,7 +338,7 @@ async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactio
       .input("invoice", sql.NVarChar(100), invoiceNumber)
       .input("sepayOrderId", sql.NVarChar(150), sepayOrderId)
       .input("transactionId", sql.NVarChar(150), transactionId)
-      .query("UPDATE [mk].[PaymentOrder] SET Status = 'Paid', SePayOrderId = @sepayOrderId, SePayTransactionId = @transactionId, PaidAt = SYSUTCDATETIME() WHERE InvoiceNumber = @invoice AND Status = 'Pending'");
+      .query("UPDATE [mk].[PaymentOrder] SET Status = 'Paid', SePayOrderId = @sepayOrderId, SePayTransactionId = @transactionId, PaidAt = SYSUTCDATETIME() WHERE InvoiceNumber = @invoice AND Status IN ('Pending', 'Cancelled')");
     if (!updateResult.rowsAffected[0]) {
       await transaction.commit();
       return true;
@@ -458,6 +558,52 @@ async function createLearningAdvice(skillScores, grade) {
     return { ...fallback, generatedBy: "Fallback", fallbackReason: reason };
   }
 }
+
+async function persistPlacementLearningPath(pool, studentId, attemptId, grade, storedSummary, advice) {
+  await ensureLearningPathSchema();
+  const topicResult = await pool.request().query("SELECT TopicId, TopicCode FROM [mk].[Topic]");
+  const topicIds = new Map(topicResult.recordset.map((topic) => [topic.TopicCode, topic.TopicId]));
+  let roadmap = Array.isArray(advice.roadmap) ? advice.roadmap.slice(0, 3) : [];
+  roadmap = roadmap.filter((item) => item && topicIds.has(item.topicCode) && item.title && item.activity);
+  if (!roadmap.length) {
+    advice = { ...fallbackLearningAdvice(storedSummary.skillScores || [], grade), generatedBy: "System", fallbackReason: "provider_disabled" };
+    roadmap = advice.roadmap.filter((item) => topicIds.has(item.topicCode));
+  }
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+  try {
+    await transaction.request().input("studentId", sql.Int, studentId)
+      .query("UPDATE [mk].[LearningPath] SET Status='Archived', EndDate=CAST(SYSUTCDATETIME() AS DATE) WHERE StudentId=@studentId AND Status='Active'");
+    const pathResult = await transaction.request()
+      .input("studentId", sql.Int, studentId)
+      .input("generatedBy", sql.VarChar(20), advice.generatedBy || "System")
+      .input("reason", sql.NVarChar(1000), advice.summary.slice(0, 1000))
+      .query("INSERT INTO [mk].[LearningPath] (StudentId, GeneratedBy, StartDate, Status, Reason) OUTPUT INSERTED.LearningPathId VALUES (@studentId, @generatedBy, CAST(SYSUTCDATETIME() AS DATE), 'Active', @reason)");
+    const pathId = pathResult.recordset[0].LearningPathId;
+    for (const [index, item] of roadmap.entries()) {
+      const plannedDate = new Date();
+      plannedDate.setUTCDate(plannedDate.getUTCDate() + index);
+      await transaction.request().input("pathId", sql.BigInt, pathId)
+        .input("topicId", sql.Int, topicIds.get(item.topicCode))
+        .input("plannedDate", sql.Date, plannedDate)
+        .input("order", sql.SmallInt, index + 1)
+        .query("INSERT INTO [mk].[LearningPathItem] (LearningPathId, TopicId, PlannedDate, ItemOrder) VALUES (@pathId, @topicId, @plannedDate, @order)");
+    }
+    const updatedSummary = { ...storedSummary, advice };
+    await transaction.request()
+      .input("attemptId", sql.BigInt, attemptId)
+      .input("studentId", sql.Int, studentId)
+      .input("summary", sql.NVarChar(sql.MAX), JSON.stringify(updatedSummary))
+      .query("UPDATE [mk].[PlacementAttempt] SET AbilitySummary=@summary WHERE AttemptId=@attemptId AND StudentId=@studentId AND SubmittedAt IS NOT NULL");
+    await transaction.commit();
+    return advice;
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+}
+
 app.use(cors({ origin: process.env.NODE_ENV === "production" ? (process.env.FRONTEND_ORIGIN || "http://localhost:5173") : true }));
 app.use(express.json({ limit: "7mb" }));
 
@@ -476,14 +622,237 @@ app.get("/api/health", async (_request, response) => {
   catch (error) { response.status(503).json({ ok: false, message: "Không thể kết nối SQL Server.", detail: error.message }); }
 });
 
-app.post("/api/auth/register", async (request, response) => {
+app.post("/api/auth/register/request-otp", async (request, response) => {
   const body = request.body || {};
-  const allowedRoles = ["Student", "Parent"];
-  const role = allowedRoles.includes(body.role) ? body.role : "Student";
+  const role = ["Student", "Parent"].includes(body.role) ? body.role : "Student";
   const errors = validateCredentials(body, true);
   if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
-  try { return response.status(201).json(await registerUser({ ...body, role })); }
-  catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng ký thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
+  const email = body.email.trim().toLowerCase();
+  try {
+    await ensureEmailOtpSchema();
+    const pool = await getPool();
+    await pool.request().query("DELETE FROM [mk].[EmailRegistrationOtp] WHERE CreatedAt < DATEADD(day,-1,SYSUTCDATETIME())");
+    const existing = await pool.request().input("email", sql.NVarChar(255), email)
+      .query("SELECT TOP 1 UserId FROM [mk].[AppUser] WHERE Email=@email");
+    if (existing.recordset.length) return response.status(409).json({ message: "Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác." });
+
+    const limits = await pool.request().input("email", sql.NVarChar(255), email).query(`
+      SELECT COUNT(*) AS SentCount, MAX(CreatedAt) AS LastSentAt
+      FROM [mk].[EmailRegistrationOtp]
+      WHERE Email=@email AND CreatedAt >= DATEADD(hour,-1,SYSUTCDATETIME())`);
+    const { SentCount, LastSentAt } = limits.recordset[0];
+    if (Number(SentCount) >= 5) return response.status(429).json({ message: "Bạn đã yêu cầu quá nhiều mã. Vui lòng thử lại sau một giờ." });
+    if (LastSentAt && Date.now() - new Date(LastSentAt).getTime() < 60000) {
+      return response.status(429).json({ message: "Vui lòng đợi ít nhất 60 giây trước khi yêu cầu mã mới." });
+    }
+
+    const code = String(randomInt(0, 1000000)).padStart(6, "0");
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const inserted = await pool.request()
+      .input("email", sql.NVarChar(255), email)
+      .input("codeHash", sql.Char(64), hashRegistrationOtp(email, code))
+      .input("expiresAt", sql.DateTime2, expiresAt)
+      .query(`INSERT INTO [mk].[EmailRegistrationOtp] (Email, CodeHash, ExpiresAt)
+              OUTPUT INSERTED.OtpId VALUES (@email, @codeHash, @expiresAt)`);
+    try {
+      await sendRegistrationOtpEmail(email, code);
+    } catch (error) {
+      await pool.request().input("otpId", sql.BigInt, inserted.recordset[0].OtpId)
+        .query("DELETE FROM [mk].[EmailRegistrationOtp] WHERE OtpId=@otpId");
+      throw error;
+    }
+    return response.json({ message: "Máy chủ email đã chấp nhận gửi mã OTP. Kiểm tra Inbox hoặc Spam; mã có hiệu lực trong 10 phút." });
+  } catch (error) {
+    return response.status(error.status || 500).json({
+      message: error.status ? error.message : "Không thể gửi mã xác minh email.",
+      ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}),
+    });
+  }
+});
+
+app.post("/api/auth/register", async (request, response) => {
+  const body = request.body || {};
+  const role = ["Student", "Parent"].includes(body.role) ? body.role : "Student";
+  const errors = validateCredentials(body, true);
+  if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
+  if (!/^\d{6}$/.test(String(body.otp || ""))) return response.status(400).json({ message: "Vui lòng nhập mã OTP gồm 6 chữ số." });
+  const email = body.email.trim().toLowerCase();
+  try {
+    await ensureEmailOtpSchema();
+    const pool = await getPool();
+    const existing = await pool.request().input("email", sql.NVarChar(255), email)
+      .query("SELECT TOP 1 UserId FROM [mk].[AppUser] WHERE Email=@email");
+    if (existing.recordset.length) return response.status(409).json({ message: "Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác." });
+
+    const otpResult = await pool.request().input("email", sql.NVarChar(255), email).query(`
+      SELECT TOP 1 OtpId, CodeHash, Attempts
+      FROM [mk].[EmailRegistrationOtp]
+      WHERE Email=@email AND ConsumedAt IS NULL AND ExpiresAt > SYSUTCDATETIME()
+      ORDER BY CreatedAt DESC`);
+    const otp = otpResult.recordset[0];
+    if (!otp) return response.status(400).json({ message: "Mã OTP không hợp lệ hoặc đã hết hạn. Hãy yêu cầu mã mới." });
+    if (otp.Attempts >= 5) return response.status(429).json({ message: "Bạn đã nhập sai mã quá nhiều lần. Hãy yêu cầu mã OTP mới." });
+
+    const submittedHash = Buffer.from(hashRegistrationOtp(email, String(body.otp)));
+    const savedHash = Buffer.from(String(otp.CodeHash).trim());
+    if (submittedHash.length !== savedHash.length || !timingSafeEqual(submittedHash, savedHash)) {
+      await pool.request().input("otpId", sql.BigInt, otp.OtpId)
+        .query("UPDATE [mk].[EmailRegistrationOtp] SET Attempts=Attempts+1 WHERE OtpId=@otpId");
+      return response.status(400).json({ message: "Mã OTP chưa đúng. Vui lòng kiểm tra email và thử lại." });
+    }
+
+    if (role === "Parent") await ensureParentModuleSchema();
+    const result = await registerUser({ ...body, email, role });
+    await pool.request().input("otpId", sql.BigInt, otp.OtpId)
+      .query("UPDATE [mk].[EmailRegistrationOtp] SET ConsumedAt=SYSUTCDATETIME() WHERE OtpId=@otpId AND ConsumedAt IS NULL");
+    return response.status(201).json(result);
+  } catch (error) {
+    return response.status(error.status || 500).json({
+      message: error.status ? error.message : "Đăng ký thất bại.",
+      ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}),
+    });
+  }
+});
+
+app.post("/api/auth/password-reset/request-otp", async (request, response) => {
+  const email = typeof request.body?.email === "string" ? request.body.email.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 255) {
+    return response.status(400).json({ message: "Email không hợp lệ." });
+  }
+  const genericMessage = "Nếu email này đã đăng ký, mã OTP sẽ được gửi đến hộp thư của bạn.";
+  try {
+    await ensurePasswordResetOtpSchema();
+    const pool = await getPool();
+    await pool.request().query("DELETE FROM [mk].[EmailPasswordResetOtp] WHERE CreatedAt < DATEADD(day,-1,SYSUTCDATETIME())");
+    const user = await pool.request().input("email", sql.NVarChar(255), email)
+      .query("SELECT TOP 1 UserId FROM [mk].[AppUser] WHERE Email=@email AND IsActive=1");
+    if (!user.recordset.length) return response.json({ message: genericMessage });
+
+    const limits = await pool.request().input("email", sql.NVarChar(255), email).query(`
+      SELECT COUNT(*) AS SentCount, MAX(CreatedAt) AS LastSentAt
+      FROM [mk].[EmailPasswordResetOtp]
+      WHERE Email=@email AND CreatedAt >= DATEADD(hour,-1,SYSUTCDATETIME())`);
+    const { SentCount, LastSentAt } = limits.recordset[0];
+    if (Number(SentCount) >= 5 || (LastSentAt && Date.now() - new Date(LastSentAt).getTime() < 60000)) {
+      return response.json({ message: genericMessage });
+    }
+
+    const code = String(randomInt(0, 1000000)).padStart(6, "0");
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const inserted = await pool.request()
+      .input("email", sql.NVarChar(255), email)
+      .input("codeHash", sql.Char(64), hashRegistrationOtp(email, code, "password-reset"))
+      .input("expiresAt", sql.DateTime2, expiresAt)
+      .query(`INSERT INTO [mk].[EmailPasswordResetOtp] (Email, CodeHash, ExpiresAt)
+              OUTPUT INSERTED.OtpId VALUES (@email, @codeHash, @expiresAt)`);
+    try {
+      await sendPasswordResetOtpEmail(email, code);
+    } catch (error) {
+      await pool.request().input("otpId", sql.BigInt, inserted.recordset[0].OtpId)
+        .query("DELETE FROM [mk].[EmailPasswordResetOtp] WHERE OtpId=@otpId");
+      throw error;
+    }
+    return response.json({ message: genericMessage });
+  } catch (error) {
+    return response.status(error.status || 500).json({
+      message: error.status ? error.message : "Không thể gửi email đặt lại mật khẩu.",
+      ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}),
+    });
+  }
+});
+
+app.post("/api/auth/password-reset/confirm", async (request, response) => {
+  const body = request.body || {};
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const otpCode = String(body.otp || "");
+  const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+  const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 255) return response.status(400).json({ message: "Email không hợp lệ." });
+  if (!/^\d{6}$/.test(otpCode)) return response.status(400).json({ message: "Mã OTP phải gồm 6 chữ số." });
+  if (newPassword.length < 6) return response.status(400).json({ message: "Mật khẩu mới cần có ít nhất 6 ký tự." });
+  if (newPassword !== confirmPassword) return response.status(400).json({ message: "Xác nhận mật khẩu mới chưa khớp." });
+
+  let transaction;
+  try {
+    await ensurePasswordResetOtpSchema();
+    const pool = await getPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const otpResult = await transaction.request().input("email", sql.NVarChar(255), email).query(`
+      SELECT TOP 1 OtpId, CodeHash, Attempts
+      FROM [mk].[EmailPasswordResetOtp] WITH (UPDLOCK, HOLDLOCK)
+      WHERE Email=@email AND ConsumedAt IS NULL AND ExpiresAt > SYSUTCDATETIME()
+      ORDER BY CreatedAt DESC`);
+    const otp = otpResult.recordset[0];
+    if (!otp) {
+      await transaction.rollback();
+      return response.status(400).json({ message: "Mã OTP không hợp lệ hoặc đã hết hạn. Hãy yêu cầu mã mới." });
+    }
+    if (otp.Attempts >= 5) {
+      await transaction.rollback();
+      return response.status(429).json({ message: "Bạn đã nhập sai mã quá nhiều lần. Hãy yêu cầu mã OTP mới." });
+    }
+
+    const submittedHash = Buffer.from(hashRegistrationOtp(email, otpCode, "password-reset"));
+    const savedHash = Buffer.from(String(otp.CodeHash).trim());
+    if (submittedHash.length !== savedHash.length || !timingSafeEqual(submittedHash, savedHash)) {
+      await transaction.request().input("otpId", sql.BigInt, otp.OtpId)
+        .query("UPDATE [mk].[EmailPasswordResetOtp] SET Attempts=Attempts+1 WHERE OtpId=@otpId");
+      await transaction.commit();
+      return response.status(400).json({ message: "Mã OTP chưa đúng. Vui lòng kiểm tra email và thử lại." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const consumed = await transaction.request().input("otpId", sql.BigInt, otp.OtpId)
+      .query("UPDATE [mk].[EmailPasswordResetOtp] SET ConsumedAt=SYSUTCDATETIME() WHERE OtpId=@otpId AND ConsumedAt IS NULL");
+    if (!consumed.rowsAffected[0]) {
+      await transaction.rollback();
+      return response.status(400).json({ message: "Mã OTP đã được sử dụng. Hãy yêu cầu mã mới." });
+    }
+    const updated = await transaction.request()
+      .input("email", sql.NVarChar(255), email)
+      .input("passwordHash", sql.NVarChar(500), passwordHash)
+      .query("UPDATE [mk].[AppUser] SET PasswordHash=@passwordHash, UpdatedAt=SYSUTCDATETIME() WHERE Email=@email AND IsActive=1");
+    if (!updated.rowsAffected[0]) {
+      await transaction.rollback();
+      return response.status(400).json({ message: "Không thể đặt lại mật khẩu cho tài khoản này." });
+    }
+    await transaction.commit();
+    return response.json({ message: "Đổi mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới." });
+  } catch (error) {
+    await transaction?.rollback().catch(() => {});
+    return response.status(error.status || 500).json({
+      message: error.status ? error.message : "Không thể đặt lại mật khẩu.",
+      ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}),
+    });
+  }
+});
+
+app.post("/api/auth/change-password", authenticate, async (request, response) => {
+  const currentPassword = typeof request.body?.currentPassword === "string" ? request.body.currentPassword : "";
+  const newPassword = typeof request.body?.newPassword === "string" ? request.body.newPassword : "";
+  const confirmPassword = typeof request.body?.confirmPassword === "string" ? request.body.confirmPassword : "";
+  if (!currentPassword) return response.status(400).json({ message: "Vui lòng nhập mật khẩu hiện tại." });
+  if (newPassword.length < 6 || Buffer.byteLength(newPassword, "utf8") > 72) return response.status(400).json({ message: "Mật khẩu mới cần có ít nhất 6 ký tự và không vượt quá 72 byte." });
+  if (newPassword !== confirmPassword) return response.status(400).json({ message: "Xác nhận mật khẩu mới chưa khớp." });
+  if (newPassword === currentPassword) return response.status(400).json({ message: "Mật khẩu mới phải khác mật khẩu hiện tại." });
+
+  try {
+    const pool = await getPool();
+    const result = await pool.request().input("userId", sql.Int, request.user.userId)
+      .query("SELECT PasswordHash FROM [mk].[AppUser] WHERE UserId=@userId AND IsActive=1");
+    const passwordHash = result.recordset[0]?.PasswordHash;
+    if (!passwordHash) return response.status(400).json({ message: "Tài khoản Google chưa có mật khẩu đăng nhập. Hãy dùng chức năng Quên mật khẩu tại màn hình đăng nhập để tạo mật khẩu bằng OTP email." });
+    if (!await bcrypt.compare(currentPassword, passwordHash)) return response.status(400).json({ message: "Mật khẩu hiện tại chưa chính xác." });
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
+    await pool.request().input("userId", sql.Int, request.user.userId)
+      .input("passwordHash", sql.NVarChar(500), newPasswordHash)
+      .query("UPDATE [mk].[AppUser] SET PasswordHash=@passwordHash, UpdatedAt=SYSUTCDATETIME() WHERE UserId=@userId AND IsActive=1");
+    return response.json({ message: "Đổi mật khẩu thành công." });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể đổi mật khẩu.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
 });
 
 app.post("/api/auth/login", async (request, response) => {
@@ -495,7 +864,11 @@ app.post("/api/auth/login", async (request, response) => {
 });
 
 app.post("/api/auth/google", async (request, response) => {
-  try { return response.json(await loginWithGoogle(request.body?.credential)); }
+  try {
+    const requestedRole = ["Student", "Parent"].includes(request.body?.role) ? request.body.role : undefined;
+    if (requestedRole === "Parent") await ensureParentModuleSchema();
+    return response.json(await loginWithGoogle(request.body?.credential, requestedRole));
+  }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Google thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
 
@@ -565,9 +938,11 @@ app.post("/api/payments/premium/create", authenticate, async (request, response)
     order_invoice_number: invoiceNumber,
     customer_id: `MATHKIDS_${request.user.userId}`,
     payment_method: "BANK_TRANSFER",
-    success_url: `${publicApiUrl}/api/payments/return/success?invoice=${encodeURIComponent(invoiceNumber)}`,
-    error_url: `${publicApiUrl}/api/payments/return/error?invoice=${encodeURIComponent(invoiceNumber)}`,
-    cancel_url: `${publicApiUrl}/api/payments/return/cancel?invoice=${encodeURIComponent(invoiceNumber)}`,
+    // Browser returns go straight to the app so they do not depend on a temporary
+    // backend tunnel. The app reconciles successful orders through the API.
+    success_url: `${publicAppUrl}/thanh-toan/success?invoice=${encodeURIComponent(invoiceNumber)}`,
+    error_url: `${publicAppUrl}/thanh-toan/error?invoice=${encodeURIComponent(invoiceNumber)}`,
+    cancel_url: `${publicAppUrl}/thanh-toan/cancel?invoice=${encodeURIComponent(invoiceNumber)}`,
   };
   try {
     const pool = await getPool();
@@ -643,15 +1018,44 @@ app.get("/api/payments/premium/status", authenticate, async (request, response) 
 app.get("/api/payments/:invoice/status", authenticate, async (request, response) => {
   try {
     const pool = await getPool();
-    const result = await pool.request().input("invoice", sql.NVarChar(100), request.params.invoice).input("userId", sql.Int, request.user.userId).query(`
+    const invoice = request.params.invoice;
+    const loadPayment = () => pool.request().input("invoice", sql.NVarChar(100), invoice).input("userId", sql.Int, request.user.userId).query(`
       SELECT po.InvoiceNumber AS invoiceNumber, po.Amount AS amount, po.Status AS status, po.PaidAt AS paidAt, ps.ExpiresAt AS expiresAt
       FROM [mk].[PaymentOrder] po LEFT JOIN [mk].[PremiumSubscription] ps ON ps.PaymentOrderId = po.PaymentOrderId
       WHERE po.InvoiceNumber = @invoice AND po.UserId = @userId
     `);
+    let result = await loadPayment();
     if (!result.recordset[0]) return response.status(404).json({ message: "Không tìm thấy đơn thanh toán." });
+    if (result.recordset[0].status === "Pending" && request.query.reconcile === "1") {
+      await reconcileSePayInvoice(invoice).catch(() => false);
+      result = await loadPayment();
+    }
     return response.json({ payment: result.recordset[0] });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải trạng thái thanh toán.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.post("/api/payments/:invoice/cancel", authenticate, async (request, response) => {
+  try {
+    const pool = await getPool();
+    const invoice = request.params.invoice;
+    await pool.request()
+      .input("invoice", sql.NVarChar(100), invoice)
+      .input("userId", sql.Int, request.user.userId)
+      .query("UPDATE [mk].[PaymentOrder] SET Status = 'Cancelled' WHERE InvoiceNumber = @invoice AND UserId = @userId AND Status = 'Pending'");
+    const result = await pool.request()
+      .input("invoice", sql.NVarChar(100), invoice)
+      .input("userId", sql.Int, request.user.userId)
+      .query(`
+        SELECT po.InvoiceNumber AS invoiceNumber, po.Amount AS amount, po.Status AS status, po.PaidAt AS paidAt, ps.ExpiresAt AS expiresAt
+        FROM [mk].[PaymentOrder] po LEFT JOIN [mk].[PremiumSubscription] ps ON ps.PaymentOrderId = po.PaymentOrderId
+        WHERE po.InvoiceNumber = @invoice AND po.UserId = @userId
+      `);
+    if (!result.recordset[0]) return response.status(404).json({ message: "Không tìm thấy đơn thanh toán." });
+    return response.json({ payment: result.recordset[0] });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể cập nhật giao dịch đã hủy.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
 });
 
@@ -845,10 +1249,22 @@ app.get("/api/students/me/assessment/latest", authenticate, async (request, resp
       ORDER BY SubmittedAt DESC
     `);
     const attempt = result.recordset[0];
-    let resultData = attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...JSON.parse(attempt.AbilitySummary) } : null;
-    if (resultData && !await hasActivePremium(pool, request.user.userId)) {
+    let storedSummary = {};
+    try { storedSummary = JSON.parse(attempt?.AbilitySummary || "{}"); } catch { storedSummary = {}; }
+    let resultData = attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...storedSummary } : null;
+    const isPremium = resultData ? await hasActivePremium(pool, request.user.userId) : false;
+    if (resultData && !isPremium) {
       resultData = { ...resultData, isPremium: false, advice: { summary: "Kết quả và bản đồ kỹ năng của con đã được lưu. Nâng cấp Premium để mở phân tích và lộ trình cá nhân hóa.", strengths: [], focus: [], roadmap: [], generatedBy: "System", premiumRequired: true } };
-    } else if (resultData) resultData.isPremium = true;
+    } else if (resultData) {
+      const advice = resultData.advice || {};
+      const needsPremiumAdvice = advice.premiumRequired || !Array.isArray(advice.roadmap) || !advice.roadmap.length || (advice.generatedBy === "Fallback" && !advice.fallbackReason);
+      if (needsPremiumAdvice && Array.isArray(resultData.skillScores) && resultData.skillScores.length) {
+        const grade = Number(resultData.grade) || 1;
+        const refreshedAdvice = await createLearningAdvice(resultData.skillScores, grade);
+        resultData.advice = await persistPlacementLearningPath(pool, request.user.userId, attempt.AttemptId, grade, storedSummary, refreshedAdvice);
+      }
+      resultData.isPremium = true;
+    }
     return response.json({ result: resultData });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải kết quả đánh giá.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
@@ -1772,32 +2188,118 @@ app.post("/api/games/rewards", authenticate, async (request, response) => {
   }
 });
 
-app.get("/api/students/me/rewards", authenticate, async (request, response) => {
+app.post("/api/games/arcade/reward", authenticate, async (request, response) => {
+  const gameCode = typeof request.body?.gameCode === "string" ? request.body.gameCode : "";
+  const completedUnits = Number(request.body?.completedUnits);
+  const gameRules = {
+    memory: { units: 6, activity: "ARCADE_MEMORY" },
+    garden: { units: 3, activity: "ARCADE_GARDEN" },
+    balance: { units: 3, activity: "ARCADE_BALANCE" },
+    maze: { units: 3, activity: "ARCADE_MAZE" },
+    formula: { units: 3, activity: "ARCADE_FORMULA" },
+    word: { units: 3, activity: "ARCADE_WORD" },
+    geometry: { units: 3, activity: "ARCADE_GEOMETRY" },
+  };
+  const rule = gameRules[gameCode];
+  if (!rule || !Number.isInteger(completedUnits) || completedUnits !== rule.units) {
+    return response.status(400).json({ message: "Lượt chơi chưa hoàn thành hoặc mã trò chơi không hợp lệ." });
+  }
+  let transaction;
   try {
     await ensureDailyChallengeSchema();
     const pool = await getPool();
-    const [studentResult, inventoryResult] = await Promise.all([
-      pool.request().input("studentId", sql.Int, request.user.userId)
-        .query("SELECT TotalXp, TotalStars FROM [mk].[Student] WHERE StudentId = @studentId"),
-      pool.request().input("studentId", sql.Int, request.user.userId)
-        .query("SELECT RewardCode, IsEquipped FROM [mk].[StudentRewardInventory] WHERE StudentId = @studentId"),
-    ]);
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const student = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT StudentId FROM [mk].[Student] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId=@studentId");
+    if (!student.recordset.length) {
+      await transaction.rollback();
+      return response.status(403).json({ message: "Chỉ học sinh mới nhận XP trò chơi." });
+    }
+    const claimDate = vietnamDateKey();
+    const existing = await transaction.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("claimDate", sql.Date, claimDate)
+      .input("activity", sql.NVarChar(30), rule.activity)
+      .query("SELECT RewardXp FROM [mk].[StudentRewardClaim] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId=@studentId AND ClaimDate=@claimDate AND ActivityCode=@activity");
+    if (existing.recordset.length) {
+      const current = await transaction.request().input("studentId", sql.Int, request.user.userId)
+        .query("SELECT TotalXp FROM [mk].[Student] WHERE StudentId=@studentId");
+      await transaction.commit();
+      const totalXp = Number(current.recordset[0]?.TotalXp || 0);
+      return response.json({ rewardXp: 0, totalXp, level: Math.floor(totalXp / 100) + 1, alreadyClaimedToday: true, message: "Trò chơi này đã nhận XP hôm nay rồi. Mai quay lại chơi tiếp nhé!" });
+    }
+    const rewardXp = 10;
+    await transaction.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("claimDate", sql.Date, claimDate)
+      .input("activity", sql.NVarChar(30), rule.activity)
+      .input("rewardXp", sql.Int, rewardXp)
+      .query("INSERT INTO [mk].[StudentRewardClaim] (StudentId, ClaimDate, ActivityCode, RewardXp, RewardStars) VALUES (@studentId, @claimDate, @activity, @rewardXp, 0)");
+    const updated = await transaction.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("rewardXp", sql.Int, rewardXp)
+      .query("UPDATE [mk].[Student] SET TotalXp=ISNULL(TotalXp,0)+@rewardXp OUTPUT INSERTED.TotalXp WHERE StudentId=@studentId");
+    await transaction.commit();
+    const totalXp = Number(updated.recordset[0]?.TotalXp || 0);
+    return response.json({ rewardXp, totalXp, level: Math.floor(totalXp / 100) + 1, alreadyClaimedToday: false, message: `Bạn nhận được ${rewardXp} XP!` });
+  } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
+    return response.status(500).json({ message: "Không thể cộng XP trò chơi.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.get("/api/students/me/rewards", authenticate, async (request, response) => {
+  let transaction;
+  try {
+    await ensureDailyChallengeSchema();
+    const pool = await getPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const studentResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT TotalXp, TotalStars FROM [mk].[Student] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId");
     const student = studentResult.recordset[0];
-    if (!student) return response.status(404).json({ message: "Không tìm thấy hồ sơ học sinh." });
+    if (!student) {
+      await transaction.rollback();
+      return response.status(404).json({ message: "Không tìm thấy hồ sơ học sinh." });
+    }
     const totalXp = Number(student.TotalXp || 0);
-    const totalStars = Number(student.TotalStars || 0);
+    let totalStars = Number(student.TotalStars || 0);
+    let newlyAwardedStars = 0;
+    const awardedResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT BadgeCode FROM [mk].[StudentBadgeAward] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId");
+    const awardedCodes = new Set(awardedResult.recordset.map((row) => row.BadgeCode));
+    for (const badge of xpBadges) {
+      if (totalXp < badge.threshold || awardedCodes.has(badge.code)) continue;
+      await transaction.request().input("studentId", sql.Int, request.user.userId)
+        .input("badgeCode", sql.NVarChar(40), badge.code)
+        .input("stars", sql.Int, badge.starsReward)
+        .query("INSERT INTO [mk].[StudentBadgeAward] (StudentId, BadgeCode, StarsAwarded) VALUES (@studentId, @badgeCode, @stars)");
+      newlyAwardedStars += badge.starsReward;
+    }
+    if (newlyAwardedStars) {
+      await transaction.request().input("studentId", sql.Int, request.user.userId).input("stars", sql.Int, newlyAwardedStars)
+        .query("UPDATE [mk].[Student] SET TotalStars = ISNULL(TotalStars, 0) + @stars WHERE StudentId = @studentId");
+      totalStars += newlyAwardedStars;
+    }
+    const inventoryResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT RewardCode, IsEquipped FROM [mk].[StudentRewardInventory] WHERE StudentId = @studentId");
+    await transaction.commit();
     const ownedCodes = inventoryResult.recordset.map((item) => item.RewardCode);
-    const equippedReward = inventoryResult.recordset.find((item) => item.IsEquipped)?.RewardCode || "";
+    const equippedRewards = inventoryResult.recordset.filter((item) => item.IsEquipped).map((item) => item.RewardCode);
+    const equippedReward = equippedRewards[0] || "";
     return response.json({
-      totalXp, totalStars,
+      totalXp, totalStars, newlyAwardedStars,
       level: Math.floor(totalXp / 100) + 1,
       levelProgress: totalXp % 100,
       nextLevelXp: 100,
-      badges: xpBadges.map((badge) => ({ ...badge, unlocked: totalXp >= badge.threshold })),
-      catalog: rewardCatalog.map((item) => ({ ...item, owned: ownedCodes.includes(item.code), equipped: equippedReward === item.code })),
+      badges: xpBadges.map((badge) => ({ ...badge, unlocked: totalXp >= badge.threshold, starsAwarded: awardedCodes.has(badge.code) || (totalXp >= badge.threshold) })),
+      catalog: rewardCatalog.map((item) => ({ ...item, owned: ownedCodes.includes(item.code), equipped: equippedRewards.includes(item.code) })),
       equippedReward,
+      equippedRewards,
     });
   } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
     return response.status(500).json({ message: "Không thể tải phần thưởng.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
 });
@@ -1859,8 +2361,13 @@ app.post("/api/students/me/rewards/:code/equip", authenticate, async (request, r
       await transaction.rollback();
       return response.status(403).json({ message: "Hãy đổi vật phẩm trước khi trang bị." });
     }
-    await transaction.request().input("studentId", sql.Int, request.user.userId)
-      .query("UPDATE [mk].[StudentRewardInventory] SET IsEquipped = 0 WHERE StudentId = @studentId");
+    const categoryCodes = rewardCatalog.filter((reward) => reward.category === item.category);
+    const unequipRequest = transaction.request().input("studentId", sql.Int, request.user.userId);
+    const categoryParameters = categoryCodes.map((reward, index) => {
+      unequipRequest.input(`categoryCode${index}`, sql.NVarChar(40), reward.code);
+      return `@categoryCode${index}`;
+    });
+    await unequipRequest.query(`UPDATE [mk].[StudentRewardInventory] SET IsEquipped = 0 WHERE StudentId = @studentId AND RewardCode IN (${categoryParameters.join(",")})`);
     await transaction.request().input("studentId", sql.Int, request.user.userId).input("code", sql.NVarChar(40), item.code)
       .query("UPDATE [mk].[StudentRewardInventory] SET IsEquipped = 1 WHERE StudentId = @studentId AND RewardCode = @code");
     await transaction.commit();
@@ -1879,6 +2386,9 @@ app.get("/api/students/me/dashboard", authenticate, async (request, response) =>
       SELECT u.UserId, u.Email, u.DisplayName, u.UserRole,
              s.Grade, s.TotalXp, s.TotalStars, s.AvatarUrl,
              (SELECT TOP 1 ri.RewardCode FROM [mk].[StudentRewardInventory] ri WHERE ri.StudentId = s.StudentId AND ri.IsEquipped = 1) AS EquippedReward,
+             (SELECT TOP 1 ri.RewardCode FROM [mk].[StudentRewardInventory] ri WHERE ri.StudentId = s.StudentId AND ri.IsEquipped = 1 AND ri.RewardCode IN ('rainbow-frame','sunset-frame','starlight-frame')) AS EquippedFrame,
+             (SELECT TOP 1 ri.RewardCode FROM [mk].[StudentRewardInventory] ri WHERE ri.StudentId = s.StudentId AND ri.IsEquipped = 1 AND ri.RewardCode IN ('fox-companion','owl-companion','dino-companion')) AS EquippedCompanion,
+             (SELECT TOP 1 ri.RewardCode FROM [mk].[StudentRewardInventory] ri WHERE ri.StudentId = s.StudentId AND ri.IsEquipped = 1 AND ri.RewardCode IN ('space-theme','ocean-theme','forest-theme')) AS EquippedTheme,
              (SELECT COUNT_BIG(*) FROM [mk].[StudentLessonProgress] lp WHERE lp.StudentId = s.StudentId AND lp.IsCompleted = 1)
                + (SELECT COUNT_BIG(*) FROM [mk].[LessonAttempt] la WHERE la.StudentId = s.StudentId AND la.Status = 'Completed') AS CompletedLessons,
              (SELECT COUNT_BIG(*) FROM [mk].[PlacementAttempt] pa WHERE pa.StudentId = s.StudentId AND pa.SubmittedAt IS NOT NULL) AS CompletedAssessments
@@ -1897,6 +2407,7 @@ app.get("/api/students/me/dashboard", authenticate, async (request, response) =>
       totalXp: row.TotalXp,
       totalStars: row.TotalStars,
       equippedReward: row.EquippedReward || "",
+      equippedRewards: [row.EquippedFrame, row.EquippedCompanion, row.EquippedTheme].filter(Boolean),
       avatarUrl: row.AvatarUrl,
       completedLessons: Number(row.CompletedLessons),
       completedAssessments: Number(row.CompletedAssessments),
@@ -2386,13 +2897,31 @@ async function requireLinkedChild(request, response, next) {
   }
 }
 
+async function requireLinkedChildPremium(request, response, next) {
+  try {
+    const pool = await getPool();
+    if (!await hasActivePremium(pool, request.linkedStudentId)) {
+      return response.status(403).json({
+        code: "PREMIUM_REQUIRED",
+        message: "Báo cáo chi tiết và gợi ý hỗ trợ phụ huynh được mở khi tài khoản học sinh liên kết có Premium.",
+      });
+    }
+    return next();
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể kiểm tra quyền Premium của học sinh.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+}
+
 // ──────────────────────────────────────────────────────────
 // PARENT — Báo cáo học tập (FR-13)
 // ──────────────────────────────────────────────────────────
-app.get("/api/parents/me/children/:studentId/report", authenticate, requireParent, requireLinkedChild, async (request, response) => {
+app.get("/api/parents/me/children/:studentId/report", authenticate, requireParent, requireLinkedChild, requireLinkedChildPremium, async (request, response) => {
   const studentId = request.linkedStudentId;
   try {
     await ensureParentModuleSchema();
+    await ensureLearningPathSchema();
+    await ensureWeeklyAssessmentSchema();
+    await ensureMonthlyAssessmentSchema();
     const pool = await getPool();
     const [infoResult, summaryResult, topicsResult, weeklyResult, assessResult] = await Promise.all([
       pool.request().input("studentId", sql.Int, studentId).query(`
@@ -2424,8 +2953,8 @@ app.get("/api/parents/me/children/:studentId/report", authenticate, requireParen
         ORDER BY WeekStart DESC`),
       pool.request().input("studentId", sql.Int, studentId).query(`
         SELECT
-          (SELECT TOP 1 Score FROM [mk].[LearningPath] WHERE StudentId=@studentId ORDER BY GeneratedAt DESC) AS PlacementScore,
-          (SELECT TOP 1 GeneratedAt FROM [mk].[LearningPath] WHERE StudentId=@studentId ORDER BY GeneratedAt DESC) AS PlacementAt,
+          (SELECT TOP 1 Score FROM [mk].[PlacementAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY SubmittedAt DESC) AS PlacementScore,
+          (SELECT TOP 1 SubmittedAt FROM [mk].[PlacementAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY SubmittedAt DESC) AS PlacementAt,
           (SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyScore,
           (SELECT TOP 1 SubmittedAt FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyAt,
           (SELECT TOP 1 Score FROM [mk].[MonthlyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY TestMonth DESC) AS LastMonthlyScore,
@@ -2467,18 +2996,30 @@ app.get("/api/parents/me/children/:studentId/alerts", authenticate, requireParen
   const studentId = request.linkedStudentId;
   try {
     await ensureParentModuleSchema();
+    await ensureLearningPathSchema();
+    await ensureDailyChallengeSchema();
+    await ensureWeeklyAssessmentSchema();
+    await ensureMonthlyAssessmentSchema();
     const pool = await getPool();
     const now = new Date();
     const alerts = [];
     const inactiveResult = await pool.request().input("studentId", sql.Int, studentId)
-      .query("SELECT MAX(CreatedAt) AS LastActive FROM [mk].[StudentQuestionResults] WHERE StudentId = @studentId");
+      .query(`SELECT MAX(ActivityAt) AS LastActive FROM (
+        SELECT MAX(CreatedAt) AS ActivityAt FROM [mk].[StudentQuestionResults] WHERE StudentId=@studentId
+        UNION ALL SELECT MAX(CompletedAt) FROM [mk].[StudentLessonProgress] WHERE StudentId=@studentId AND IsCompleted=1
+        UNION ALL SELECT MAX(SubmittedAt) FROM [mk].[PlacementAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL
+        UNION ALL SELECT MAX(SubmittedAt) FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL
+        UNION ALL SELECT MAX(SubmittedAt) FROM [mk].[MonthlyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL
+        UNION ALL SELECT MAX(CompletedAt) FROM [mk].[DailyChallengeAttempt] WHERE StudentId=@studentId AND IsCompleted=1
+        UNION ALL SELECT MAX(ClaimedAt) FROM [mk].[StudentRewardClaim] WHERE StudentId=@studentId
+      ) activities`);
     const lastActive = inactiveResult.recordset[0]?.LastActive;
     const daysSinceActive = lastActive ? Math.floor((now - new Date(lastActive)) / 86400000) : 999;
     if (daysSinceActive >= 3) {
       alerts.push({
         type: "INACTIVE", icon: "⏰",
         title: daysSinceActive >= 999 ? "Con chưa bắt đầu học" : `Con chưa học ${daysSinceActive} ngày liên tiếp`,
-        detail: daysSinceActive >= 999 ? "Hãy khuyến khích con làm bài kiểm tra đầu vào để bắt đầu lộ trình học." : `Con chưa đăng nhập học từ ${new Date(lastActive).toLocaleDateString("vi-VN")}.`,
+        detail: daysSinceActive >= 999 ? "Hãy khuyến khích con làm bài kiểm tra đầu vào để bắt đầu lộ trình học." : `Con chưa có hoạt động học tập từ ${new Date(lastActive).toLocaleDateString("vi-VN")}.`,
       });
     }
     const weakResult = await pool.request().input("studentId", sql.Int, studentId).query(`
@@ -2488,18 +3029,24 @@ app.get("/api/parents/me/children/:studentId/alerts", authenticate, requireParen
       INNER JOIN [mk].[Questions] q ON q.QuestionId = r.QuestionId
       INNER JOIN [mk].[Topics] t ON t.TopicId = q.TopicId
       WHERE r.StudentId = @studentId AND r.CreatedAt >= DATEADD(day,-7,SYSUTCDATETIME())
-      GROUP BY t.TopicId, t.Name HAVING COUNT(*) >= 5 AND AVG(CAST(r.IsCorrect AS FLOAT)) < 0.5
+      GROUP BY t.TopicId, t.Name HAVING COUNT(*) >= 3 AND AVG(CAST(r.IsCorrect AS FLOAT)) < 0.6
       ORDER BY CorrectRate ASC`);
     for (const topic of weakResult.recordset) {
-      alerts.push({ type: "WEAK_TOPIC", icon: "📉", title: `Con hay sai phần "${topic.TopicName}"`, detail: `Tỷ lệ đúng chỉ đạt ${topic.CorrectRate}% trong tuần qua (${topic.Total} câu).` });
+      alerts.push({ type: "WEAK_TOPIC", icon: "📉", title: `Con cần luyện thêm phần "${topic.TopicName}"`, detail: `Con đúng ${topic.CorrectRate}% trong ${topic.Total} câu gần đây ở chủ đề này. Hãy cùng con xem lại lý thuyết và luyện thêm.` });
     }
     const reviewResult = await pool.request().input("studentId", sql.Int, studentId).query(`
-      SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt]
-      WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL AND Score < 60 ORDER BY WeekStart DESC`);
-    if (reviewResult.recordset[0]) {
-      alerts.push({ type: "NEEDS_REVIEW", icon: "📚", title: "Con cần ôn lại kiến thức", detail: `Điểm kiểm tra tuần gần nhất chỉ đạt ${reviewResult.recordset[0].Score}/100. Hãy khuyến khích con ôn lại bài cũ.` });
+      SELECT TOP 1 Score, AssessmentType FROM (
+        SELECT Score, SubmittedAt, 'tuần' AS AssessmentType FROM [mk].[WeeklyAssessmentAttempt]
+        WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL
+        UNION ALL
+        SELECT Score, SubmittedAt, 'tháng' AS AssessmentType FROM [mk].[MonthlyAssessmentAttempt]
+        WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL
+      ) assessments ORDER BY SubmittedAt DESC`);
+    const latestAssessment = reviewResult.recordset[0];
+    if (latestAssessment && Number(latestAssessment.Score) < 60) {
+      alerts.push({ type: "NEEDS_REVIEW", icon: "📚", title: "Con nên ôn lại kiến thức", detail: `Bài kiểm tra ${latestAssessment.AssessmentType} gần nhất đạt ${latestAssessment.Score}/100. Hãy cùng con xem lại các câu sai và bài học liên quan.` });
     }
-    return response.json({ alerts, unreadCount: alerts.length });
+    return response.json({ alerts, alertCount: alerts.length, checkedAt: now.toISOString() });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải cảnh báo học tập.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
@@ -2508,7 +3055,7 @@ app.get("/api/parents/me/children/:studentId/alerts", authenticate, requireParen
 // ──────────────────────────────────────────────────────────
 // PARENT — Gợi ý hỗ trợ (FR-15)
 // ──────────────────────────────────────────────────────────
-app.get("/api/parents/me/children/:studentId/recommendations", authenticate, requireParent, requireLinkedChild, async (request, response) => {
+app.get("/api/parents/me/children/:studentId/recommendations", authenticate, requireParent, requireLinkedChild, requireLinkedChildPremium, async (request, response) => {
   const studentId = request.linkedStudentId;
   try {
     await ensureParentModuleSchema();

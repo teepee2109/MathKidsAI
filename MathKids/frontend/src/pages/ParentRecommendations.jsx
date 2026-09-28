@@ -12,11 +12,12 @@ export default function ParentRecommendations({ onLogout }) {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [premiumLocked, setPremiumLocked] = useState(false);
 
   useEffect(() => {
     getChildRecommendations(Number(studentId))
       .then((data) => setRecs(data.recommendations || []))
-      .catch((err) => setError(err.message))
+      .catch((err) => { if (err.code === "PREMIUM_REQUIRED") setPremiumLocked(true); else setError(err.message); })
       .finally(() => setLoading(false));
   }, [studentId]);
 
@@ -52,8 +53,9 @@ export default function ParentRecommendations({ onLogout }) {
 
           {loading && <div className="parent-loading">Đang phân tích...</div>}
           {error && <div className="parent-error" role="alert">{error}</div>}
+          {premiumLocked && <section className="parent-error" role="status"><strong>👑 Tính năng Premium</strong><p>Gợi ý học tập chi tiết sẽ mở khi tài khoản học sinh được liên kết có Premium. Hãy nâng cấp bằng tài khoản của học sinh.</p><Link to="/parent/dashboard">Quay lại tổng quan phụ huynh</Link></section>}
 
-          <div className="recs-list">
+          {!premiumLocked && <div className="recs-list">
             {recs.map((rec, i) => (
               <div className="rec-card" key={i}>
                 <span className="rec-icon">{rec.icon}</span>
@@ -66,7 +68,7 @@ export default function ParentRecommendations({ onLogout }) {
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </section>
     </main>

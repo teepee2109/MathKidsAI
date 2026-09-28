@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import { getCachedUser } from "../authStorage";
@@ -12,13 +12,23 @@ export default function ParentAlerts({ onLogout }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [checkedAt, setCheckedAt] = useState(null);
 
-  useEffect(() => {
-    getChildAlerts(Number(studentId))
-      .then((data) => setAlerts(data.alerts || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+  const loadAlerts = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getChildAlerts(Number(studentId));
+      setAlerts(data.alerts || []);
+      setCheckedAt(data.checkedAt || new Date().toISOString());
+    } catch (err) {
+      setError(err.message || "Không thể tải cảnh báo.");
+    } finally {
+      setLoading(false);
+    }
   }, [studentId]);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
 
   const alertColorClass = { INACTIVE: "alert-orange", WEAK_TOPIC: "alert-red", NEEDS_REVIEW: "alert-blue" };
 
@@ -51,8 +61,9 @@ export default function ParentAlerts({ onLogout }) {
 
           <div className="alerts-header">
             <h1>🔔 Cảnh báo học tập</h1>
-            <Link to={`/parent/children/${studentId}/recommendations`} className="btn-recs">💡 Xem gợi ý hỗ trợ</Link>
+            <div className="alerts-actions"><button className="btn-alert-refresh" onClick={loadAlerts} disabled={loading}>{loading ? "Đang kiểm tra…" : "↻ Cập nhật"}</button><Link to={`/parent/children/${studentId}/recommendations`} className="btn-recs">💡 Xem gợi ý hỗ trợ</Link></div>
           </div>
+          {checkedAt && !loading && !error && <p className="alerts-checked-at">Cập nhật lúc {new Date(checkedAt).toLocaleString("vi-VN")}</p>}
 
           {loading && <div className="parent-loading">Đang tải...</div>}
           {error && <div className="parent-error" role="alert">{error}</div>}

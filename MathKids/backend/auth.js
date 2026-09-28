@@ -69,6 +69,12 @@ export function validateCredentials(
     ) {
         errors.email =
             "Email không đúng định dạng.";
+    } else if (
+        isRegister &&
+        !/@gmail\.com$/i.test(email.trim())
+    ) {
+        errors.email =
+            "Email đăng ký bắt buộc phải kết thúc bằng @gmail.com.";
     }
 
     // Password
@@ -348,7 +354,7 @@ export async function loginUser({
     };
 }
 
-export async function loginWithGoogle(credential) {
+export async function loginWithGoogle(credential, requestedRole) {
     if (!/^\d+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(String(process.env.GOOGLE_CLIENT_ID || "").trim())) {
         const error = new Error("Google login chưa được cấu hình đúng trên máy chủ: cần Client ID kết thúc bằng .apps.googleusercontent.com.");
         error.status = 503;
@@ -356,6 +362,11 @@ export async function loginWithGoogle(credential) {
     }
     if (typeof credential !== "string" || credential.length < 20) {
         const error = new Error("Thông tin xác thực Google không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    if (requestedRole !== undefined && !["Student", "Parent"].includes(requestedRole)) {
+        const error = new Error("Vai trò đăng ký không hợp lệ.");
         error.status = 400;
         throw error;
     }
@@ -368,6 +379,11 @@ export async function loginWithGoogle(credential) {
     }
 
     const email = googleUser.email.trim().toLowerCase();
+    if (requestedRole && !/@gmail\.com$/i.test(email)) {
+        const error = new Error("Email đăng ký bằng Google bắt buộc phải kết thúc bằng @gmail.com.");
+        error.status = 400;
+        throw error;
+    }
     const pool = await getPool();
     const existingResult = await pool.request().input("email", sql.NVarChar(255), email).query("SELECT TOP 1 UserId, Email, DisplayName, UserRole, IsActive FROM [mk].[AppUser] WHERE Email = @email");
     let user = existingResult.recordset[0];
@@ -377,6 +393,7 @@ export async function loginWithGoogle(credential) {
         throw error;
     }
     if (!user) {
+        const userRole = requestedRole || "Student";
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {
@@ -384,9 +401,12 @@ export async function loginWithGoogle(credential) {
                 .input("email", sql.NVarChar(255), email)
                 .input("passwordHash", sql.NVarChar(500), await bcrypt.hash(randomUUID(), 12))
                 .input("displayName", sql.NVarChar(120), String(googleUser.name || email.split("@")[0]).slice(0, 120))
-                .query("INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName) OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole VALUES (@email, @passwordHash, @displayName)");
+                .input("userRole", sql.VarChar(20), userRole)
+                .query("INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName, UserRole) OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole VALUES (@email, @passwordHash, @displayName, @userRole)");
             user = created.recordset[0];
-            await transaction.request().input("studentId", sql.Int, user.UserId).query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, 1)");
+            if (userRole === "Student") {
+                await transaction.request().input("studentId", sql.Int, user.UserId).query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, 1)");
+            }
             await transaction.commit();
         } catch (error) {
             await transaction.rollback().catch(() => {});
@@ -395,6 +415,11 @@ export async function loginWithGoogle(credential) {
                 user = retry.recordset[0];
             } else throw error;
         }
+    }
+    if (requestedRole && user.UserRole !== requestedRole) {
+        const error = new Error("Email Google này đã có tài khoản với vai trò khác. Hãy đăng nhập bằng tài khoản hiện có; không thể đổi vai trò khi đăng ký lại.");
+        error.status = 409;
+        throw error;
     }
     return { token: createToken(user), user: { id: user.UserId, email: user.Email, name: user.DisplayName, role: user.UserRole } };
 }

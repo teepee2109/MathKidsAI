@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import { getCachedUser } from "../authStorage";
 import { claimGameRewards, getQuestionTopics, getQuestions, submitQuestionAnswer } from "../services/questions";
+import ArcadeMathGames from "./ArcadeMathGames";
 import "./MathGames.css";
 import "./MathQuestionBank.css";
 
@@ -21,7 +23,17 @@ function GameHeader() {
 }
 
 function GamePicker() {
-  return <main className="math-games-page"><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn trò chơi của bạn!</h1><p>Mỗi lớp có một thử thách riêng, vừa sức và thật vui.</p></div><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
+  const grade = Number(getCachedUser()?.grade) || 1;
+  const arcadeGames = [
+    { mode: "memory", icon: "🃏", color: "game-purple", tag: "TRÍ NHỚ", title: "Lật thẻ tìm cặp", type: "Ghi nhớ · Ghép nhanh", description: "Lật các thẻ, ghi nhớ phép tính và ghép với kết quả tương ứng." },
+    { mode: "garden", icon: "🌻", color: "game-green", tag: "GHÉP SỐ", title: "Khu vườn tổng số", type: "Chọn chiến lược · Tạo tổng", description: "Chọn hai quả táo có tổng bằng mục tiêu để gieo trồng từng luống." },
+    { mode: "balance", icon: "⚖️", color: "game-orange", tag: "TƯ DUY CHIẾN LƯỢC", title: "Tháp cân bằng", type: "Phân loại · Cân bằng", description: "Phân các khối số vào hai bệ để tìm cách chia có tổng bằng nhau." },
+    { mode: "maze", icon: "🤖", color: "game-blue", tag: "ĐIỀU KHIỂN ROBOT", title: "Mê cung tổng số", type: "Di chuyển · Tìm đường", description: "Điều khiển robot gom số đúng mục tiêu rồi tìm đường tới cửa ra." },
+    { mode: "formula", icon: "🧩", color: "game-purple", tag: "CÔNG THỨC", title: "Lắp ráp công thức", type: "Tính toán · Hoàn thiện", description: "Tính phần còn thiếu để hoàn thiện phép tính theo lớp." },
+    { mode: "word", icon: "🔎", color: "game-orange", tag: "TOÁN ĐỐ", title: "Giải mã bài toán", type: "Đọc hiểu · Lập phép tính", description: "Đọc tình huống, chọn phép tính phù hợp rồi nhập lời giải." },
+    { mode: "geometry", icon: "📐", color: "game-blue", tag: "TOÁN HÌNH", title: "Xây hình đúng yêu cầu", type: "Tạo hình · Diện tích · Chu vi", description: "Điều chỉnh hình chữ nhật để đạt diện tích hoặc chu vi mục tiêu." },
+  ];
+  return <main className="math-games-page"><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn trò chơi của bạn!</h1><p>Trải nghiệm trò trí nhớ, công thức, toán đố và hình học — không chỉ làm quiz.</p></div><h2 className="game-section-title">🎮 Trò chơi tương tác</h2><div className="grade-game-grid arcade-picker-grid">{arcadeGames.map((game) => <Link key={game.mode} to={`/tro-choi?mini=${game.mode}&grade=${grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">{game.tag}</span><h2>{game.title}</h2><strong>{game.type}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div><h2 className="game-section-title">📚 Thử thách theo lớp</h2><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
 }
 
 function PlayGame({ game }) {
@@ -161,7 +173,9 @@ function PlayGame({ game }) {
 
 export default function MathGames() {
   const { grade: rawGrade } = useParams();
-  if (!rawGrade) return <GamePicker />;
+  const [searchParams] = useSearchParams();
+  const miniGame = searchParams.get("mini");
+  if (!rawGrade) return ["memory", "garden", "balance", "maze", "formula", "word", "geometry"].includes(miniGame) ? <ArcadeMathGames mode={miniGame} grade={searchParams.get("grade")} /> : <GamePicker />;
   const grade = Number(rawGrade);
   const game = games.find((item) => item.grade === grade);
   if (!game) return <GamePicker />;

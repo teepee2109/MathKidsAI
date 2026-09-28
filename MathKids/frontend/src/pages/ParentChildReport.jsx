@@ -12,11 +12,12 @@ export default function ParentChildReport({ onLogout }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [premiumLocked, setPremiumLocked] = useState(false);
 
   useEffect(() => {
     getChildReport(Number(studentId))
       .then((data) => setReport(data.report))
-      .catch((err) => setError(err.message))
+      .catch((err) => { if (err.code === "PREMIUM_REQUIRED") setPremiumLocked(true); else setError(err.message); })
       .finally(() => setLoading(false));
   }, [studentId]);
 
@@ -49,6 +50,7 @@ export default function ParentChildReport({ onLogout }) {
 
           {loading && <div className="parent-loading">Đang tải báo cáo...</div>}
           {error && <div className="parent-error" role="alert">{error}</div>}
+          {premiumLocked && <section className="parent-error" role="status"><strong>👑 Tính năng Premium</strong><p>Báo cáo chi tiết và gợi ý hỗ trợ sẽ mở khi tài khoản học sinh được liên kết có Premium. Hãy nâng cấp bằng tài khoản của học sinh.</p><Link to="/parent/dashboard">Quay lại tổng quan phụ huynh</Link></section>}
 
           {report && (
             <>

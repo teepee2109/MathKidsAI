@@ -11,6 +11,19 @@ BEGIN
   );
 END;
 
+-- One-time star bonus when an XP badge milestone is first reached.
+IF OBJECT_ID(N'[mk].[StudentBadgeAward]', N'U') IS NULL
+BEGIN
+  CREATE TABLE [mk].[StudentBadgeAward] (
+    StudentId INT NOT NULL,
+    BadgeCode NVARCHAR(40) NOT NULL,
+    StarsAwarded INT NOT NULL,
+    AwardedAt DATETIME2 NOT NULL CONSTRAINT DF_StudentBadgeAward_AwardedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT PK_StudentBadgeAward PRIMARY KEY (StudentId, BadgeCode),
+    CONSTRAINT FK_StudentBadgeAward_Student FOREIGN KEY (StudentId) REFERENCES [mk].[Student](StudentId)
+  );
+END;
+
 -- One assessment reward per student per local Vietnam calendar day.
 IF OBJECT_ID(N'[mk].[StudentRewardClaim]', N'U') IS NULL
 BEGIN

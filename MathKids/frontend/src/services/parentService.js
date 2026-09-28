@@ -44,7 +44,11 @@ export async function unlinkChild(studentId) {
 export async function getChildReport(studentId) {
   const res = await apiFetch(`parents/me/children/${studentId}/report`, { cache: "no-store", headers: authHeaders() });
   const d = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(d.message || "Không thể tải báo cáo.");
+  if (!res.ok) {
+    const error = new Error([d.message, d.detail].filter(Boolean).join(" — ") || "Không thể tải báo cáo.");
+    error.code = d.code;
+    throw error;
+  }
   return d;
 }
 
@@ -58,7 +62,11 @@ export async function getChildAlerts(studentId) {
 export async function getChildRecommendations(studentId) {
   const res = await apiFetch(`parents/me/children/${studentId}/recommendations`, { cache: "no-store", headers: authHeaders() });
   const d = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(d.message || "Không thể tải gợi ý.");
+  if (!res.ok) {
+    const error = new Error(d.message || "Không thể tải gợi ý.");
+    error.code = d.code;
+    throw error;
+  }
   return d;
 }
 

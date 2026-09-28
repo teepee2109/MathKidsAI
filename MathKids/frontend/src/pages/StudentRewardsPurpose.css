@@ -1,0 +1,5 @@
+.badge-purpose-note{margin:10px 0 0;padding:11px 14px;border-radius:11px;background:#fff9e9;color:#9a711f;font-size:11px;line-height:1.6}
+.shop-preview.equipped-sunset-frame>span{padding:8px;border:4px solid transparent;border-radius:50%;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#ffe36e,#ff984f,#ee5d88) border-box}
+.shop-preview.equipped-starlight-frame>span{padding:8px;border:4px solid transparent;border-radius:50%;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#6ee7ff,#7966ee,#e66ff2) border-box}
+.shop-preview.equipped-ocean-theme{background:linear-gradient(135deg,#78dce0,#68aee9)}
+.shop-preview.equipped-forest-theme{background:linear-gradient(135deg,#a9dc9c,#f1d17c)}

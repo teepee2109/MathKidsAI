@@ -18,6 +18,9 @@ export default function StudentProfile() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [pageError, setPageError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordMessage, setPasswordMessage] = useState({ text: "", type: "" });
+  const [changingPassword, setChangingPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -220,6 +223,27 @@ export default function StudentProfile() {
     }
   }
 
+  async function changePassword(event) {
+    event.preventDefault();
+    setChangingPassword(true);
+    setPasswordMessage({ text: "", type: "" });
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken()}` },
+        body: JSON.stringify(passwordForm),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể đổi mật khẩu.");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordMessage({ text: data.message || "Đổi mật khẩu thành công.", type: "success" });
+    } catch (error) {
+      setPasswordMessage({ text: error.message || "Không thể kết nối tới máy chủ.", type: "error" });
+    } finally {
+      setChangingPassword(false);
+    }
+  }
+
   return <main className="profile-page">
     <header className="profile-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="back-dashboard">← Quay lại dashboard</Link></header>
     <section className="profile-card">
@@ -244,6 +268,21 @@ export default function StudentProfile() {
         {saved && <div className="profile-message success" role="status">Đã lưu hồ sơ thành công. Dashboard đã được cập nhật.</div>}
         <div className="profile-actions"><Link to="/dashboard">Hủy</Link><button type="submit" disabled={saving}>{saving ? "Đang lưu…" : "Lưu thay đổi"}</button></div>
       </form>}
+
+      <section className="profile-password-section">
+        <div className="invite-heading">
+          <span className="invite-icon">🔒</span>
+          <div><small>BẢO MẬT TÀI KHOẢN</small><h2>Đổi mật khẩu</h2><p>Nhập mật khẩu hiện tại để đặt mật khẩu mới.</p></div>
+        </div>
+        <form className="profile-password-form" onSubmit={changePassword}>
+          <label className="profile-field"><span>Mật khẩu hiện tại</span><input type="password" autoComplete="current-password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))} required /></label>
+          <label className="profile-field"><span>Mật khẩu mới</span><input type="password" autoComplete="new-password" minLength={6} maxLength={72} value={passwordForm.newPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))} required /><small>Tối thiểu 6 ký tự.</small></label>
+          <label className="profile-field"><span>Xác nhận mật khẩu mới</span><input type="password" autoComplete="new-password" minLength={6} maxLength={72} value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))} required /></label>
+          {passwordMessage.text && <div className={`profile-message ${passwordMessage.type}`} role={passwordMessage.type === "error" ? "alert" : "status"}>{passwordMessage.text}</div>}
+          <div className="profile-actions"><button type="submit" disabled={changingPassword}>{changingPassword ? "Đang cập nhật…" : "Cập nhật mật khẩu"}</button></div>
+        </form>
+        <p className="profile-password-hint">Đăng nhập bằng Google? Hãy dùng “Quên mật khẩu” ở màn hình đăng nhập để tạo mật khẩu qua OTP email.</p>
+      </section>
 
       {/* ── Liên kết phụ huynh ── */}
       <section className="invite-section">

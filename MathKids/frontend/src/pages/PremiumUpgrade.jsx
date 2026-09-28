@@ -11,7 +11,7 @@ const features = [
   { label: "Gợi ý bài học theo từng ngày", free: false, premium: true },
   { label: "Theo dõi tiến bộ theo tuần", free: false, premium: true },
   { label: "Bài luyện tập nâng cao theo điểm yếu", free: false, premium: true },
-  { label: "Báo cáo chi tiết cho phụ huynh", free: false, premium: true },
+  { label: "Báo cáo học tập & gợi ý hỗ trợ cho phụ huynh", free: false, premium: true },
 ];
 
 export default function PremiumUpgrade() {

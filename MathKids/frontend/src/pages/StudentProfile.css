@@ -20,3 +20,5 @@
 .invite-hint { margin: 0; font-size: 12px; color: #94a3b8; }
 .invite-btn-refresh { background: none; border: 1px solid #6366f1; color: #6366f1; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; width: fit-content; }
 .invite-btn-refresh:hover { background: #eef2ff; }
+.profile-password-section{margin-top:24px;padding:24px;border:1px solid #dceaf5;border-radius:14px;background:linear-gradient(135deg,#f6fbff,#fbfaff)}.profile-password-section .invite-heading{margin-bottom:14px}.profile-password-form{max-width:460px}.profile-password-form .profile-field small{color:#8294aa;font-size:10px;font-weight:600}.profile-password-form .profile-actions{justify-content:flex-start}.profile-password-hint{margin:10px 0 0;color:#778ba5;font-size:11px;line-height:1.6}
+@media(max-width:600px){.profile-password-section{padding:17px}.profile-password-section .invite-heading{gap:10px}.profile-password-section .invite-icon{font-size:29px}}

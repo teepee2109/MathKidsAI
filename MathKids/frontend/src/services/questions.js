@@ -45,3 +45,10 @@ export function claimGameRewards(resultIds) {
     body: JSON.stringify({ resultIds }),
   });
 }
+
+export function claimArcadeReward(gameCode, completedUnits) {
+  return request("games/arcade/reward", {
+    method: "POST",
+    body: JSON.stringify({ gameCode, completedUnits }),
+  });
+}

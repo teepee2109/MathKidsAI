@@ -28,6 +28,13 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const [showPassword, setShowPassword] = useState(false);
     const [remember, setRemember] = useState(true);
     const [error, setError] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
+    const [forgotPassword, setForgotPassword] = useState(false);
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmNewPassword, setConfirmNewPassword] = useState("");
+    const [otp, setOtp] = useState("");
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpMessage, setOtpMessage] = useState("");
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [googleReady, setGoogleReady] = useState(false);
@@ -39,7 +46,14 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setIsSubmitting(true);
         setError("");
         try {
-            const response = await fetch(`${apiBase}/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credential }) });
+            const response = await fetch(`${apiBase}/auth/google`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    credential,
+                    ...(mode === "register" ? { role: registerRole } : {}),
+                }),
+            });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.message || "Đăng nhập Google thất bại.");
             saveAuthSession(data, true);
@@ -50,7 +64,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         } finally {
             setIsSubmitting(false);
         }
-    }, [navigate, onAuthenticated]);
+    }, [mode, navigate, onAuthenticated, registerRole]);
 
     useEffect(() => {
         if (!googleClientId) return undefined;
@@ -98,7 +112,12 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
         setValues(initialValues);
         setError("");
+        setSuccessMessage("");
+        setForgotPassword(false);
         setErrors({});
+        setOtp("");
+        setOtpSent(false);
+        setOtpMessage("");
     }
 
     function handleChange(event) {
@@ -110,6 +129,10 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         }));
 
         setError("");
+        setSuccessMessage("");
+        setOtp("");
+        setOtpSent(false);
+        setOtpMessage("");
 
         setErrors((current) => ({
             ...current,
@@ -143,13 +166,15 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         } else if (!emailPattern.test(email)) {
             nextErrors.email =
                 "Email không đúng định dạng.";
+        } else if (isRegister && !/@gmail\.com$/i.test(email)) {
+            nextErrors.email = "Email đăng ký bắt buộc phải kết thúc bằng @gmail.com.";
         }
 
         // Validate password
-        if (!values.password) {
+        if (!forgotPassword && !values.password) {
             nextErrors.password =
                 "Vui lòng nhập mật khẩu.";
-        } else if (values.password.length < 6) {
+        } else if (!forgotPassword && values.password.length < 6) {
             nextErrors.password =
                 "Mật khẩu cần có ít nhất 6 ký tự.";
         }
@@ -164,6 +189,14 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         ) {
             nextErrors.confirmPassword =
                 "Mật khẩu xác nhận chưa khớp.";
+        }
+
+        if (isRegister && otpSent && !/^\d{6}$/.test(otp)) nextErrors.otp = "Mã OTP phải gồm 6 chữ số.";
+        if (forgotPassword && otpSent) {
+            if (!/^\d{6}$/.test(otp)) nextErrors.otp = "Mã OTP phải gồm 6 chữ số.";
+            if (newPassword.length < 6) nextErrors.newPassword = "Mật khẩu mới cần có ít nhất 6 ký tự.";
+            if (!confirmNewPassword) nextErrors.confirmNewPassword = "Vui lòng xác nhận mật khẩu mới.";
+            else if (newPassword !== confirmNewPassword) nextErrors.confirmNewPassword = "Xác nhận mật khẩu mới chưa khớp.";
         }
 
         setErrors(nextErrors);
@@ -182,20 +215,59 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setError("");
 
         try {
+            if (forgotPassword) {
+                const isConfirmingReset = otpSent;
+                const response = await fetch(`${apiBase}/auth/password-reset/${isConfirmingReset ? "confirm" : "request-otp"}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(isConfirmingReset
+                        ? { email: values.email.trim(), otp, newPassword, confirmPassword: confirmNewPassword }
+                        : { email: values.email.trim() }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể xử lý yêu cầu đặt lại mật khẩu.");
+                if (!isConfirmingReset) {
+                    setOtpSent(true);
+                    setOtpMessage(data.message || "Nếu email đã đăng ký, mã OTP sẽ được gửi đến hộp thư.");
+                } else {
+                    setForgotPassword(false);
+                    setOtpSent(false);
+                    setOtp("");
+                    setNewPassword("");
+                    setConfirmNewPassword("");
+                    setValues((current) => ({ ...current, password: "", confirmPassword: "" }));
+                    setSuccessMessage(data.message || "Đổi mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.");
+                }
+                return;
+            }
+
+            const registrationBody = {
+                name: values.name.trim(),
+                email: values.email.trim(),
+                password: values.password,
+                confirmPassword: values.confirmPassword,
+                role: registerRole,
+            };
+            if (isRegister && !otpSent) {
+                const response = await fetch(`${apiBase}/auth/register/request-otp`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(registrationBody),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể gửi mã OTP.");
+                setOtpSent(true);
+                setOtpMessage(data.message || "Mã xác minh đã được gửi đến email của bạn.");
+                return;
+            }
+
             // Xác định API
-            const url = `${apiBase}/auth/${mode === "register" ? "register" : "login"}`;
+            const url = `${apiBase}/auth/${isRegister ? "register" : "login"}`;
 
             // Dữ liệu gửi lên Backend
             const body =
-                mode === "register"
-                    ? {
-                        name: values.name.trim(),
-                        email: values.email.trim(),
-                        password: values.password,
-                        confirmPassword:
-                            values.confirmPassword,
-                        role: registerRole,
-                    }
+                isRegister
+                    ? { ...registrationBody, otp }
                     : {
                         email: values.email.trim(),
                         password: values.password
@@ -237,6 +309,37 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 error.message ||
                 "Không thể kết nối tới máy chủ."
             );
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    async function resendOtp() {
+        if (forgotPassword) {
+            const emailIsValid = emailPattern.test(values.email.trim());
+            setErrors(emailIsValid ? {} : { email: "Email không đúng định dạng." });
+            if (!emailIsValid) return;
+        } else if (!validate()) return;
+        setIsSubmitting(true);
+        setError("");
+        try {
+            const response = await fetch(`${apiBase}/auth/${forgotPassword ? "password-reset/request-otp" : "register/request-otp"}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(forgotPassword ? { email: values.email.trim() } : {
+                    name: values.name.trim(),
+                    email: values.email.trim(),
+                    password: values.password,
+                    confirmPassword: values.confirmPassword,
+                    role: registerRole,
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể gửi lại mã OTP.");
+            setOtpMessage(data.message || "Mã xác minh mới đã được gửi.");
+            setOtp("");
+        } catch (requestError) {
+            setError(requestError.message || "Không thể gửi lại mã OTP.");
         } finally {
             setIsSubmitting(false);
         }
@@ -334,19 +437,21 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     <div className="auth-heading">
 
                         <p className="form-kicker">
-                            {isRegister
+                            {forgotPassword ? "Bảo mật tài khoản" : isRegister
                                 ? "Bắt đầu hành trình"
                                 : "Chào mừng trở lại"}
                         </p>
 
                         <h2>
-                            {isRegister
+                            {forgotPassword ? "Đặt lại mật khẩu" : isRegister
                                 ? "Tạo tài khoản mới"
                                 : "Đăng nhập tài khoản"}
                         </h2>
 
                         <p>
-                            {isRegister
+                            {forgotPassword
+                                ? "Nhận mã OTP qua email để tạo mật khẩu mới."
+                                : isRegister
                                 ? "Tạo tài khoản để bắt đầu học Toán thật vui."
                                 : "Tiếp tục hành trình chinh phục Toán học của bạn."}
                         </p>
@@ -354,7 +459,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     </div>
 
                     {/* LOGIN / REGISTER */}
-                    <div
+                    {!forgotPassword && <div
                         className="mode-switch"
                         role="tablist"
                         aria-label="Loại biểu mẫu"
@@ -386,7 +491,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         >
                             Đăng ký
                         </button>
-                    </div>
+                    </div>}
 
                     {/* FORM */}
                     <form
@@ -440,14 +545,14 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                     <button
                                         type="button"
                                         className={`role-option ${registerRole === "Student" ? "active" : ""}`}
-                                        onClick={() => setRegisterRole("Student")}
+                                        onClick={() => { setRegisterRole("Student"); setOtpSent(false); setOtp(""); setOtpMessage(""); }}
                                     >
                                         🎒 Học sinh
                                     </button>
                                     <button
                                         type="button"
                                         className={`role-option ${registerRole === "Parent" ? "active" : ""}`}
-                                        onClick={() => setRegisterRole("Parent")}
+                                        onClick={() => { setRegisterRole("Parent"); setOtpSent(false); setOtp(""); setOtpMessage(""); }}
                                     >
                                         👨‍👩‍👧 Phụ huynh
                                     </button>
@@ -473,7 +578,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                     name="email"
                                     value={values.email}
                                     onChange={handleChange}
-                                    placeholder="you@example.com"
+                                    placeholder={isRegister ? "tenban@gmail.com" : "you@example.com"}
                                     required
                                     aria-invalid={
                                         Boolean(
@@ -493,7 +598,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         </label>
 
                         {/* PASSWORD */}
-                        <label className="field">
+                        {!forgotPassword && <label className="field">
 
                             <span>
                                 Mật khẩu
@@ -551,7 +656,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                 </small>
                             )}
 
-                        </label>
+                        </label>}
 
                         {/* CONFIRM PASSWORD */}
                         {isRegister && (
@@ -598,8 +703,46 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                             </label>
                         )}
 
+                        {(isRegister || forgotPassword) && otpSent && (
+                            <label className="field">
+                                <span>{forgotPassword ? "Mã OTP đặt lại mật khẩu" : "Mã OTP trong email"}</span>
+                                <span className="input-wrap">
+                                    <span className="input-icon">#</span>
+                                    <input
+                                        type="text"
+                                        name="otp"
+                                        value={otp}
+                                        onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                                        placeholder="Nhập mã 6 chữ số"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        maxLength={6}
+                                        required
+                                    />
+                                </span>
+                                {errors.otp && <small className="field-error">{errors.otp}</small>}
+                                <small>{otpMessage} Nếu chưa thấy email, hãy kiểm tra thư mục spam.</small>
+                                <button type="button" className="link-button" onClick={resendOtp} disabled={isSubmitting}>
+                                    Gửi lại mã OTP
+                                </button>
+                            </label>
+                        )}
+
+                        {forgotPassword && otpSent && <>
+                            <label className="field">
+                                <span>Mật khẩu mới</span>
+                                <span className="input-wrap"><span className="input-icon">▣</span><input type="password" value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setError(""); }} placeholder="Ít nhất 6 ký tự" autoComplete="new-password" required /></span>
+                                {errors.newPassword && <small className="field-error">{errors.newPassword}</small>}
+                            </label>
+                            <label className="field">
+                                <span>Nhập lại mật khẩu mới</span>
+                                <span className="input-wrap"><span className="input-icon">▣</span><input type="password" value={confirmNewPassword} onChange={(event) => { setConfirmNewPassword(event.target.value); setError(""); }} placeholder="Nhập lại mật khẩu mới" autoComplete="new-password" required /></span>
+                                {errors.confirmNewPassword && <small className="field-error">{errors.confirmNewPassword}</small>}
+                            </label>
+                        </>}
+
                         {/* LOGIN OPTIONS */}
-                        {!isRegister && (
+                        {!isRegister && !forgotPassword && (
                             <div className="form-options">
 
                                 <label className="remember">
@@ -624,12 +767,17 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                 <button
                                     type="button"
                                     className="link-button"
+                                    onClick={() => { setForgotPassword(true); setOtpSent(false); setOtp(""); setError(""); setSuccessMessage(""); }}
                                 >
                                     Quên mật khẩu?
                                 </button>
 
                             </div>
                         )}
+
+                        {forgotPassword && <button type="button" className="link-button" onClick={() => { setForgotPassword(false); setOtpSent(false); setOtp(""); setError(""); setErrors({}); }}>
+                            ← Quay lại đăng nhập
+                        </button>}
 
                         {/* ERROR */}
                         {error && (
@@ -640,6 +788,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                 {error}
                             </p>
                         )}
+                        {successMessage && <p className="form-success" role="status">{successMessage}</p>}
 
                         {/* SUBMIT */}
                         <button
@@ -649,9 +798,11 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         >
                             {isSubmitting
                                 ? "Đang xử lý..."
-                                : isRegister
-                                    ? "Tạo tài khoản"
-                                    : "Đăng nhập"}
+                                : forgotPassword
+                                    ? otpSent ? "Đổi mật khẩu" : "Gửi mã OTP"
+                                    : isRegister
+                                        ? otpSent ? "Xác minh & tạo tài khoản" : "Gửi mã OTP"
+                                        : "Đăng nhập"}
 
                             <span>→</span>
                         </button>
@@ -659,16 +810,16 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     </form>
 
                     {/* GOOGLE */}
-                    <div className="divider">
+                    {!forgotPassword && <div className="divider">
                         <span>
                             hoặc tiếp tục với
                         </span>
-                    </div>
+                    </div>}
 
-                    {googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>}
+                    {!forgotPassword && (googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>)}
 
                     {/* TERMS */}
-                    <p className="terms">
+                    {!forgotPassword && <p className="terms">
                         Bằng việc tiếp tục, bạn đồng ý với{" "}
                         <button
                             type="button"
@@ -684,7 +835,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                             Chính sách bảo mật
                         </button>
                         .
-                    </p>
+                    </p>}
 
                 </div>
 

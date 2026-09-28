@@ -4,6 +4,7 @@ import BrandLogo from "../components/BrandLogo";
 import { getAuthToken } from "../authStorage";
 import { apiFetch, apiUrl } from "../api";
 import "./StudentRewards.css";
+import "./StudentRewardsPurpose.css";
 
 export default function StudentRewards() {
   const [rewards, setRewards] = useState(null);
@@ -69,6 +70,7 @@ export default function StudentRewards() {
 
       {error && <div className="rewards-alert" role="alert"><span>{error}</span><button onClick={loadRewards}>Thử lại</button></div>}
       {notice && <div className="rewards-notice" role="status">{notice}</div>}
+      {rewards?.newlyAwardedStars > 0 && <div className="rewards-notice" role="status">🎉 Huy hiệu mới đã giúp bạn nhận thêm {rewards.newlyAwardedStars} sao!</div>}
 
       <section className="level-panel">
         <div className="level-emblem">⚡</div><div className="level-details"><div className="level-heading"><div><small>TIẾN ĐỘ CỦA BẠN</small><h2>Cấp {rewards?.level || 1}</h2></div><strong>{loading ? "…" : `${xp} XP`}</strong></div><div className="level-track"><span style={{ width: `${rewards?.levelProgress || 0}%` }} /></div><p>{rewards?.levelProgress || 0}/100 XP tới cấp tiếp theo · Bài đánh giá hoàn thành nhận XP theo kết quả.</p></div>
@@ -76,6 +78,7 @@ export default function StudentRewards() {
 
       <section className="badge-section"><div className="rewards-section-heading"><div><span className="rewards-kicker">THÀNH TỰU</span><h2>Huy hiệu của bạn</h2></div><span>{rewards?.badges?.filter((badge) => badge.unlocked).length || 0}/{rewards?.badges?.length || 4} đã mở khóa</span></div><div className="badge-grid">{(rewards?.badges || []).map((badge) => <article className={`badge-card ${badge.unlocked ? "is-unlocked" : "is-locked"}`} key={badge.code}><span>{badge.unlocked ? badge.icon : "🔒"}</span><strong>{badge.name}</strong><small>{badge.description}</small><b>{badge.unlocked ? "ĐÃ ĐẠT ĐƯỢC" : `${Math.max(0, badge.threshold - xp)} XP CÒN LẠI`}</b></article>)}</div></section>
 
+      <p className="badge-purpose-note">Mỗi huy hiệu là một cột mốc học tập và thưởng sao một lần: 50 XP (+2 sao), 150 XP (+4), 500 XP (+8), 1.000 XP (+15). Dùng sao đổi vật phẩm để trang trí avatar, gặp bạn cáo trên dashboard hoặc đổi giao diện vũ trụ.</p>
       <section className="shop-section"><div className="rewards-section-heading"><div><span className="rewards-kicker">CỬA HÀNG</span><h2>Đổi sao lấy vật phẩm</h2></div><span>Trang bị miễn phí · Đổi một lần</span></div>{loading && !rewards ? <div className="shop-loading">Đang tải cửa hàng…</div> : <div className="reward-shop-grid">{(rewards?.catalog || []).map((item) => <article className={`shop-item ${item.equipped ? "is-equipped" : ""}`} key={item.code}>
         <div className={`shop-preview preview-${item.category} ${item.equipped ? `equipped-${item.code}` : ""}`}><span>{item.icon}</span>{item.equipped && <b>ĐANG DÙNG</b>}</div>
         <div className="shop-item-info"><span className="shop-category">{item.category === "frame" ? "TRANG TRÍ AVATAR" : item.category === "companion" ? "BẠN ĐỒNG HÀNH" : "GIAO DIỆN"}</span><h3>{item.name}</h3><p>{item.description}</p><strong className="shop-price">⭐ {item.cost} sao</strong></div>

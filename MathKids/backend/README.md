@@ -36,10 +36,31 @@ VITE_GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 
 Backend xác thực ID token với Google, kiểm tra audience, issuer và email đã xác minh. Người dùng Google mới được tạo tài khoản Student cùng hồ sơ lớp 1; email đã tồn tại sẽ đăng nhập vào tài khoản hiện có.
 
+## Đăng ký và xác minh email OTP
+
+Đăng ký bằng email/mật khẩu gửi mã 6 chữ số đến email trước khi tạo tài khoản. Mã hết hạn sau 10 phút, tối đa 5 lần nhập sai và giới hạn 5 lần gửi mỗi giờ (cách nhau ít nhất 60 giây). Bảng OTP được tạo tự động.
+
+Cấu hình SMTP trong `backend/.env` (không commit thông tin thật). Với Gmail, bật xác minh 2 bước và dùng **App Password**, không dùng mật khẩu đăng nhập Gmail:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-sender@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM="MathKids <your-sender@gmail.com>"
+OTP_HASH_SECRET=your-long-random-secret
+```
+
+Nếu SMTP chưa cấu hình hoặc gửi email thất bại, đăng ký sẽ báo lỗi và không tạo tài khoản. Đăng ký bằng Google vẫn dùng email đã được Google xác minh.
+
 ## API xác thực
 
 - `GET /api/health` — kiểm tra kết nối SQL Server.
-- `POST /api/auth/register` — body `{ name, email, password, confirmPassword }`.
+- `POST /api/auth/register/request-otp` — body `{ name, email, password, confirmPassword, role }`, gửi mã OTP.
+- `POST /api/auth/register` — cùng thông tin đăng ký, bổ sung `otp` để xác minh và tạo tài khoản.
+- `POST /api/auth/password-reset/request-otp` — body `{ email }`, gửi mã OTP đổi mật khẩu nếu email có tài khoản.
+- `POST /api/auth/password-reset/confirm` — body `{ email, otp, newPassword, confirmPassword }`, xác minh OTP và đổi mật khẩu.
 - `POST /api/auth/login` — body `{ email, password }`.
 - `POST /api/auth/google` — body `{ credential }` từ Google Identity Services.
 - `GET /api/auth/me` — cần header `Authorization: Bearer <token>`.

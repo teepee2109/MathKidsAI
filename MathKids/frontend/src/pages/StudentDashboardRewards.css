@@ -1,0 +1,13 @@
+.dashboard-avatar.reward-frame-rainbow{border:3px solid transparent;box-shadow:0 0 0 2px #fff,0 0 0 5px #f5b33c;background:linear-gradient(#def5ee,#def5ee) padding-box,linear-gradient(135deg,#ff7373,#ffc64c,#52c890,#598cf4,#ae68db) border-box}
+.dashboard-avatar.reward-frame-sunset{border:3px solid #fff;box-shadow:0 0 0 4px #f58b49}
+.dashboard-avatar.reward-frame-starlight{border:3px solid #fff;box-shadow:0 0 0 2px #735ce0,0 0 10px 5px #a99aff}
+.equipped-reward-labels{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 13px}
+.equipped-reward-label{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid #ffffffa6;border-radius:20px;background:#ffffffa8;color:#466b91;font-size:10px;font-weight:900}
+.reward-theme-space .welcome-banner{background:linear-gradient(110deg,#dbe6ff,#e6e0ff 60%,#dff1ff)}
+.reward-theme-space .welcome-banner:after{position:absolute;content:"✦  ·  ✧  ·  ✦";right:30px;top:22px;color:#796bd5;font-size:24px;letter-spacing:12px;opacity:.65}
+.reward-theme-space .welcome-sun{color:#b6a9ff}
+.reward-theme-ocean .welcome-banner{background:linear-gradient(115deg,#cff5f5,#d9edff 55%,#e1f5ff)}
+.reward-theme-ocean .welcome-banner:after{position:absolute;content:"〜  🌊  〜";right:25px;top:20px;color:#1689b0;font-size:25px;letter-spacing:5px;opacity:.55}
+.reward-theme-forest .welcome-banner{background:linear-gradient(115deg,#d9f3dc,#e6f5d8 55%,#fff4d9)}
+.reward-theme-forest .welcome-banner:after{position:absolute;content:"🍃  ✿  🍃";right:20px;top:22px;font-size:25px;letter-spacing:4px;opacity:.6}
+@media(max-width:640px){.equipped-reward-label{max-width:225px;font-size:9px;line-height:1.4}.reward-theme-space .welcome-banner:after,.reward-theme-ocean .welcome-banner:after,.reward-theme-forest .welcome-banner:after{right:15px;top:12px;font-size:17px}}

@@ -36,3 +36,4 @@
 .role-option { flex: 1; padding: 10px; border: 2px solid #e5e7eb; border-radius: 10px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #6b7280; transition: border-color .15s, background .15s, color .15s; }
 .role-option.active { border-color: #6366f1; background: #eef2ff; color: #6366f1; }
 .role-option:hover:not(.active) { border-color: #c7d2fe; color: #4f46e5; }
+.form-success { margin: -2px 0 14px; color: #21845a; font-size: 12px; font-weight: 700; }

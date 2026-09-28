@@ -16,7 +16,13 @@ export default function PaymentResult() {
     let attempts = 0;
     let timer;
     const load = async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/payments/${encodeURIComponent(invoice)}/status`, { cache: "no-store", headers: { Authorization: `Bearer ${getAuthToken()}` } });
+      const endpoint = status === "cancel" ? "cancel" : "status";
+      const reconcile = status === "success" && attempts === 0 ? "?reconcile=1" : "";
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/payments/${encodeURIComponent(invoice)}/${endpoint}${reconcile}`, {
+        method: status === "cancel" ? "POST" : "GET",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
+      });
       const data = await response.json().catch(() => ({}));
       if (!active) return;
       setPayment(data.payment || null);
