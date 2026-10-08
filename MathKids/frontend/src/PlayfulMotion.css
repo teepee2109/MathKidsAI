@@ -1,0 +1,152 @@
+@keyframes page-pop-in {
+  from { opacity: 0; transform: translateY(9px) scale(.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes card-rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(2deg); }
+}
+
+@keyframes sparkle-drift {
+  0%, 100% { opacity: .55; transform: translateY(0) rotate(-4deg); }
+  50% { opacity: 1; transform: translateY(-5px) rotate(4deg); }
+}
+
+:where(.landing-page, .home, .student-dashboard, .learning-page, .math-games-page,
+  .student-rewards-page, .student-profile-page, .monthly-page, .weekly-page,
+  .placement-page, .auth-shell, .admin-shell, .parent-shell, .contact-page,
+  .premium-page, .payment-result-page) {
+  animation: page-pop-in .42s ease-out both;
+}
+
+:where(.welcome-banner, .student-stats, .dashboard-columns, .leaderboard-panel,
+  .dashboard-earned-badges, .rewards-invite, .learning-path-layout,
+  .grade-game-grid, .benefit-grid, .step-list, .admin-metrics, .report-kpis,
+  .reward-shop-grid, .profile-content, .parent-content) > * {
+  animation: card-rise-in .42s both;
+}
+
+:where(.student-stats, .learning-list, .leaderboard-list, .grade-game-grid,
+  .benefit-grid, .step-list, .report-kpis) > :nth-child(2) { animation-delay: 45ms; }
+:where(.student-stats, .learning-list, .leaderboard-list, .grade-game-grid,
+  .benefit-grid, .step-list, .report-kpis) > :nth-child(3) { animation-delay: 90ms; }
+:where(.student-stats, .grade-game-grid, .benefit-grid, .report-kpis) > :nth-child(4) { animation-delay: 135ms; }
+:where(.grade-game-grid, .benefit-grid, .report-kpis) > :nth-child(5) { animation-delay: 180ms; }
+
+:where(.stat-card, .learning-panel, .daily-panel, .leaderboard-panel,
+  .dashboard-earned-badges, .learning-card, .learning-path-item,
+  .grade-game-card, .arcade-card, .benefit-card, .step-list article,
+  .admin-metric, .accounts-panel, .admin-report-panel, .report-kpi,
+  .report-chart-card, .shop-item, .profile-card, .parent-card,
+  .monthly-panel, .weekly-panel) {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease,
+    background-color .2s ease;
+}
+
+:where(.stat-card, .learning-panel, .daily-panel, .leaderboard-panel,
+  .dashboard-earned-badges, .learning-card, .learning-path-item,
+  .grade-game-card, .arcade-card, .benefit-card, .step-list article,
+  .admin-metric, .accounts-panel, .admin-report-panel, .report-kpi,
+  .report-chart-card, .shop-item, .profile-card, .parent-card,
+  .monthly-panel, .weekly-panel):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px #244e7619;
+}
+
+:where(.welcome-cta, .game-theme-action, .learning-primary, .next-question,
+  .daily-panel > button, .landing-primary, .landing-register, .start-btn,
+  .premium-invite-button, .play-game, .result-actions a, .result-actions button) {
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+:where(.welcome-cta, .game-theme-action, .learning-primary, .next-question,
+  .daily-panel > button, .landing-primary, .landing-register, .start-btn,
+  .result-actions a, .result-actions button):hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: saturate(1.08);
+  box-shadow: 0 9px 20px #3477c933;
+}
+
+:where(button, a, input, select):focus-visible {
+  outline: 3px solid #74a8f4a6;
+  outline-offset: 3px;
+}
+
+.welcome-mascot,
+.game-theme-character,
+.arcade-emoji,
+.welcome-sun {
+  animation: mascot-float 3.4s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+.game-theme-decoration,
+.hero-orbit,
+.welcome-book {
+  animation: sparkle-drift 4s ease-in-out infinite;
+}
+
+.learning-concept,
+.learning-example,
+.learning-understanding,
+.learning-practice,
+.game-theme-hero,
+.daily-question,
+.learning-recommendation {
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+:where(.learning-concept, .learning-example, .learning-understanding,
+  .learning-practice, .daily-question, .learning-recommendation):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 20px #315d8410;
+}
+
+.math-question,
+.formula-equation {
+  animation: card-rise-in .35s ease-out both;
+}
+
+.answer-options button,
+.learning-practice-options button,
+.workshop-choices button,
+.fruit-tile,
+.memory-tile,
+.geometry-square {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease,
+    background-color .16s ease;
+}
+
+:where(.answer-options button, .learning-practice-options button,
+  .workshop-choices button, .fruit-tile, .memory-tile):hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 6px 14px #315d8414;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :where(.stat-card, .learning-panel, .daily-panel, .leaderboard-panel,
+    .dashboard-earned-badges, .learning-card, .learning-path-item,
+    .grade-game-card, .arcade-card, .benefit-card, .step-list article,
+    .admin-metric, .accounts-panel, .admin-report-panel, .report-kpi,
+    .report-chart-card, .shop-item, .profile-card, .parent-card,
+    .monthly-panel, .weekly-panel):hover,
+  :where(.learning-concept, .learning-example, .learning-understanding,
+    .learning-practice, .daily-question, .learning-recommendation):hover {
+    transform: none;
+  }
+}

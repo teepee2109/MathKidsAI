@@ -1,0 +1,66 @@
+.game-theme-picker {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin: 0 auto 18px;
+}
+
+.game-theme-picker button {
+  padding: 9px 13px;
+  border: 1px solid #dce7f3;
+  border-radius: 20px;
+  background: #fff;
+  color: #537291;
+  font: 900 11px 'Nunito';
+  cursor: pointer;
+}
+
+.game-theme-picker button.is-active {
+  border-color: #6b86ed;
+  background: #edf0ff;
+  color: #4f55b6;
+  box-shadow: 0 0 0 3px #6b86ed1a;
+}
+
+.game-theme-hero {
+  position: relative;
+  min-height: 230px;
+  overflow: hidden;
+  margin-bottom: 26px;
+  padding: 30px 38px;
+  border: 1px solid #dce7f5;
+  border-radius: 25px;
+  background: linear-gradient(120deg, #202b68, #5c4ea2 60%, #a47cd0);
+  box-shadow: 0 12px 28px #274d8120;
+}
+
+.game-theme-hero-copy { position: relative; z-index: 2; max-width: 610px; }
+.game-theme-kicker { color: #d9e2ff; font-size: 10px; font-weight: 900; letter-spacing: 1px; }
+.game-theme-hero h2 { margin: 7px 0 4px; color: #fff; font: 800 31px 'Baloo 2', cursive; }
+.game-theme-hero p { max-width: 550px; margin: 0 0 13px; color: #e5e8ff; font-size: 12px; line-height: 1.6; }
+.game-theme-fit { display: block; margin-bottom: 17px; color: #fff5b1; font-size: 11px; font-weight: 900; }
+.game-theme-action { display: inline-flex; align-items: center; gap: 12px; padding: 11px 16px; border-radius: 12px; background: #fff; color: #4a4ead; font-size: 12px; font-weight: 900; text-decoration: none; }
+.game-theme-action span { font-size: 18px; }
+.game-theme-character { position: absolute; right: 11%; bottom: -10px; z-index: 1; font-size: 130px; filter: drop-shadow(0 10px 8px #12194755); }
+.game-theme-decoration { position: absolute; top: 18px; right: 28px; color: #fff4a8; font-size: 24px; letter-spacing: 7px; opacity: .8; }
+
+.game-theme-ocean .game-theme-hero { background: linear-gradient(120deg, #086987, #159bb2 55%, #6ad5d0); }
+.game-theme-ocean .game-theme-kicker { color: #d7ffff; }
+.game-theme-ocean .game-theme-fit { color: #d9fff1; }
+.game-theme-ocean .game-theme-action { color: #08718c; }
+.game-theme-ocean .game-theme-picker button.is-active { border-color: #34aebe; background: #e4fbfb; color: #08758f; }
+.game-theme-forest .game-theme-hero { background: linear-gradient(120deg, #23643f, #4d9851 55%, #b2c95e); }
+.game-theme-forest .game-theme-kicker { color: #e3ffca; }
+.game-theme-forest .game-theme-fit { color: #fff3b5; }
+.game-theme-forest .game-theme-action { color: #317040; }
+.game-theme-forest .game-theme-picker button.is-active { border-color: #65a95e; background: #effbea; color: #367b3e; }
+.game-theme-space .game-theme-picker button.is-active { border-color: #746ee0; }
+
+@media (max-width: 600px) {
+  .game-theme-picker { flex-wrap: wrap; }
+  .game-theme-hero { min-height: 275px; padding: 23px 20px; }
+  .game-theme-hero h2 { max-width: 250px; font-size: 26px; }
+  .game-theme-hero p { max-width: 245px; }
+  .game-theme-character { right: 3%; bottom: -7px; font-size: 93px; opacity: .9; }
+  .game-theme-decoration { right: 14px; font-size: 18px; }
+}

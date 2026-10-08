@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import { getMyInviteCode } from "../services/parentService";
+import { apiFetch } from "../api";
 import "./StudentProfile.css";
 import "./StudentProfileAvatar.css";
 import "./StudentProfilePremium.css";
+import "./StudentProfileBadges.css";
 
 const emptyProfile = { name: "", email: "", dateOfBirth: "", grade: "1", avatarUrl: "" };
 
@@ -15,6 +17,7 @@ export default function StudentProfile() {
     const cached = getCachedUser();
     return cached ? { ...emptyProfile, ...cached, grade: String(cached.grade || 1) } : emptyProfile;
   });
+  const [earnedBadges, setEarnedBadges] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [pageError, setPageError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -85,6 +88,10 @@ export default function StudentProfile() {
       }
     }
     loadProfile();
+    apiFetch("students/me/rewards", { cache: "no-store", headers: { Authorization: `Bearer ${getAuthToken()}` } })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (data) setEarnedBadges((data.badges || []).filter((badge) => badge.unlocked)); })
+      .catch(() => {});
     return () => controller.abort();
   }, []);
 
@@ -256,6 +263,7 @@ export default function StudentProfile() {
         </div>
         {!premiumStatus.loading && !(premiumStatus.error && !premiumStatus.hasCachedStatus) && (premiumStatus.isPremium ? <Link to="/danh-gia" className="profile-premium-action">Xem lộ trình →</Link> : <Link to="/premium" className="profile-premium-action">Nâng cấp Premium →</Link>)}
       </section>
+      <section className="profile-earned-badges" aria-label="Huy hiệu đã đạt"><div><small>THÀNH TỰU</small><h2>Huy hiệu đã đạt</h2></div>{earnedBadges.length ? <div className="profile-earned-badge-list">{earnedBadges.map((badge) => <span key={badge.code} title={`${badge.name} · ${badge.threshold} XP`}><i>{badge.icon}</i><b>{badge.name}</b></span>)}</div> : <p>Chưa có huy hiệu. Hãy học để mở khóa thành tựu đầu tiên!</p>}<Link to="/phan-thuong">Xem tất cả →</Link></section>
       {loading && !profile.name && !profile.email ? <div className="profile-loading">Đang tải hồ sơ…</div> : <form className="profile-form" onSubmit={saveProfile}>
         <div className="profile-avatar-row"><div className="profile-avatar-preview">{!avatarFailed && (avatarPreview || profile.avatarUrl) ? <img src={avatarPreview || resolveAvatarUrl(profile.avatarUrl)} alt="Ảnh đại diện xem trước" onError={() => setAvatarFailed(true)} /> : <span className="profile-default-avatar">👦</span>}</div><div className="profile-avatar-control"><strong>Ảnh đại diện</strong><span>PNG, JPG hoặc WEBP · tối đa 5 MB</span><div className="profile-avatar-actions"><label className="avatar-file-button">{uploadingAvatar ? "Đang tải ảnh…" : "Chọn ảnh từ máy"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} disabled={uploadingAvatar || removingAvatar} /></label>{profile.avatarUrl && <button type="button" className="avatar-remove-button" onClick={removeAvatar} disabled={uploadingAvatar || removingAvatar}>{removingAvatar ? "Đang xóa…" : "Xóa ảnh"}</button>}</div></div></div>
         <label className="profile-field"><span>Họ và tên</span><input name="name" value={profile.name} onChange={updateField} maxLength={120} required />{fieldErrors.name && <small>{fieldErrors.name}</small>}</label>
@@ -283,7 +291,6 @@ export default function StudentProfile() {
         </form>
         <p className="profile-password-hint">Đăng nhập bằng Google? Hãy dùng “Quên mật khẩu” ở màn hình đăng nhập để tạo mật khẩu qua OTP email.</p>
       </section>
-
       {/* ── Liên kết phụ huynh ── */}
       <section className="invite-section">
         <div className="invite-heading">

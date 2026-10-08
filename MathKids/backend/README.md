@@ -24,7 +24,7 @@ Trong môi trường dev, Vite tự proxy `/api` sang backend ở port `4000`, v
 
 ## Google Sign-In
 
-Tạo OAuth Client ID loại **Web application** trong Google Cloud Console và thêm `http://localhost:5173` vào `Authorized JavaScript origins`. Cấu hình cùng Client ID ở hai file:
+Tạo OAuth Client ID loại **Web application** trong Google Cloud Console và thêm `http://localhost:5174` vào `Authorized JavaScript origins` (Vite của dự án chạy cổng 5174). Nếu demo qua domain khác, thêm chính xác origin của frontend đang mở. Cấu hình cùng Client ID ở hai file:
 
 ```env
 # backend/.env

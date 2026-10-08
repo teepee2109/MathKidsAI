@@ -14,6 +14,9 @@ import "./StudentPremiumInvite.css";
 import "./StudentDashboardLessons.css";
 import "./StudentDailyChallenge.css";
 import "./StudentDashboardRewards.css";
+import "./StudentDashboardBadges.css";
+import "./StudentDashboardKidFriendly.css";
+import "./StudentDashboardLearningPriority.css";
 
 const badgeMilestones = [
   { name: "Bước đầu tiên", icon: "🌱", xp: 50 },
@@ -44,6 +47,7 @@ export default function StudentDashboard({ onLogout }) {
   const [error, setError] = useState("");
   const [leaderboard, setLeaderboard] = useState(null);
   const [leaderboardError, setLeaderboardError] = useState("");
+  const [earnedBadges, setEarnedBadges] = useState([]);
   const [learningPath, setLearningPath] = useState(null);
   const [learningError, setLearningError] = useState("");
   const grade = Math.min(5, Math.max(1, Number(student?.grade) || 1));
@@ -87,12 +91,14 @@ export default function StudentDashboard({ onLogout }) {
   const loadDashboard = useCallback(async () => {
     try {
       const headers = { Authorization: `Bearer ${getAuthToken()}` };
-      const [response, premiumResponse] = await Promise.all([
+      const [response, premiumResponse, rewardsResponse] = await Promise.all([
         apiFetch("students/me/dashboard", { cache: "no-store", headers }),
         apiFetch("payments/premium/status", { cache: "no-store", headers }),
+        apiFetch("students/me/rewards", { cache: "no-store", headers }),
       ]);
       const data = await response.json().catch(() => ({}));
       const premiumData = await premiumResponse.json().catch(() => ({}));
+      const rewardsData = await rewardsResponse.json().catch(() => ({}));
       if (response.status === 401 || premiumResponse.status === 401) {
         onLogout();
         return;
@@ -108,6 +114,13 @@ export default function StudentDashboard({ onLogout }) {
       const isPremium = premiumResponse.ok ? Boolean(premiumData.isPremium) : Boolean(cached.isPremium);
       const premiumExpiresAt = premiumResponse.ok ? premiumData.subscription?.expiresAt || "" : cached.premiumExpiresAt || "";
       setStudent({ ...data.student, isPremium, premiumExpiresAt });
+      if (rewardsResponse.ok) {
+        setEarnedBadges((rewardsData.badges || []).filter((badge) => badge.unlocked));
+        if (Number.isFinite(Number(rewardsData.totalStars))) {
+          data.student.totalStars = Number(rewardsData.totalStars);
+          setStudent({ ...data.student, totalStars: Number(rewardsData.totalStars), isPremium, premiumExpiresAt });
+        }
+      }
       setAvatarBroken(false);
       saveCachedUser({ ...data.student, isPremium, premiumExpiresAt });
     } catch (loadError) {
@@ -311,7 +324,7 @@ export default function StudentDashboard({ onLogout }) {
 
     <div className="dashboard-content" id="dashboard">
       <section className="welcome-banner">
-        <div className="welcome-copy"><span className="welcome-tag">✦ KHU VỰC HỌC TẬP CỦA BẠN</span><h1>Chào {student?.name?.split(" ").at(-1) || "bạn nhỏ"}! 👋</h1><p>Sẵn sàng khám phá thêm điều mới hôm nay chưa?</p>{equippedRewards.length > 0 && <div className="equipped-reward-labels" role="status">{equippedRewards.map((code) => <span className="equipped-reward-label" key={code}>{rewardLabels[code]}</span>)}</div>}<Link to="/hoc-tap" className="welcome-cta">Tiếp tục học <span>→</span></Link></div>
+        <div className="welcome-copy"><span className="welcome-tag">✦ KHU VỰC HỌC TẬP CỦA BẠN</span><h1>Chào {student?.name?.split(" ").at(-1) || "bạn nhỏ"}! 👋</h1><p>Sẵn sàng khám phá thêm điều mới hôm nay chưa?</p><div className="welcome-learning-tip"><span>🌟</span><span>Mỗi ngày học một chút, tiến bộ thật nhiều!</span></div>{equippedRewards.length > 0 && <div className="equipped-reward-labels" role="status">{equippedRewards.map((code) => <span className="equipped-reward-label" key={code}>{rewardLabels[code]}</span>)}</div>}<Link to="/hoc-tap" className="welcome-cta">Tiếp tục học <span>→</span></Link></div>
         <div className="welcome-art" aria-hidden="true"><span className="welcome-sun">☀</span><span className="welcome-mascot">{companionIcon}</span><span className="welcome-book">1&nbsp; 2&nbsp; 3</span></div>
       </section>
 
@@ -328,28 +341,34 @@ export default function StudentDashboard({ onLogout }) {
         <div className="leaderboard-heading"><div><span className="panel-kicker">THI ĐUA LÀNH MẠNH · LỚP {leaderboard?.grade || grade}</span><h2>Top 3 học sinh</h2></div><button type="button" onClick={loadLeaderboard}>↻ Cập nhật</button></div>
         {leaderboardError ? <div className="leaderboard-empty" role="status">{leaderboardError}<button type="button" onClick={loadLeaderboard}>Thử lại</button></div>
           : leaderboard?.topStudents?.length ? <ol className="leaderboard-list">{leaderboard.topStudents.slice(0, 3).map((item) => <li key={item.rank} className={`leaderboard-row leaderboard-rank-${item.rank}`}>
-            <span className="leaderboard-medal" aria-label={`Hạng ${item.rank}`}>{["🥇", "🥈", "🥉"][item.rank - 1]}</span><span className="leaderboard-student"><strong>{item.name || "Học sinh MathKids"}</strong><small>Lớp {item.grade} · {item.totalStars} ⭐</small></span><b>{item.totalXp} XP</b>
+            <span className="leaderboard-medal" aria-label={`Hạng ${item.rank}`}>{["🥇", "🥈", "🥉"][item.rank - 1]}</span><span className="leaderboard-student"><strong>{item.name || "Học sinh MathKids"}</strong><small>Lớp {item.grade} · {item.totalStars} ⭐</small>{item.badges?.length > 0 && <span className="leaderboard-badges" aria-label="Huy hiệu đã đạt">{item.badges.map((badge) => <i key={badge.code} title={`${badge.name} · ${badge.threshold} XP`}>{badge.icon}</i>)}</span>}</span><b>{item.totalXp} XP</b>
           </li>)}</ol> : <div className="leaderboard-empty">Chưa có dữ liệu xếp hạng trong lớp này.</div>}
+      </section>
+
+      <section className="dashboard-earned-badges" aria-label="Huy hiệu đã đạt">
+        <div><span className="panel-kicker">THÀNH TỰU</span><h2>Huy hiệu của bạn</h2></div>
+        {earnedBadges.length ? <div className="dashboard-earned-badge-list">{earnedBadges.map((badge) => <span key={badge.code} title={`${badge.name} · ${badge.threshold} XP`}><i>{badge.icon}</i><b>{badge.name}</b></span>)}</div> : <p>Tiếp tục học để mở khóa huy hiệu đầu tiên nhé!</p>}
+        <Link to="/phan-thuong">Xem tất cả →</Link>
       </section>
 
       <Link to="/phan-thuong" className="rewards-invite"><span className="rewards-invite-icon">🎁</span><span className="rewards-invite-copy"><strong>Phần thưởng của bạn</strong><small>{badgeMilestones.filter((badge) => totalXp >= badge.xp).length} huy hiệu · Cấp {currentLevel} · {levelProgress}/100 XP tới cấp tiếp theo</small><span className="rewards-badge-preview">{badgeMilestones.map((badge) => <i className={totalXp >= badge.xp ? "is-unlocked" : ""} key={badge.name} title={`${badge.name} · ${badge.xp} XP`}>{badge.icon}</i>)}</span></span><b>Đổi sao & xem huy hiệu →</b></Link>
 
-      <Link to="/danh-gia" className="assessment-invite"><span>🧠</span><div><strong>{student?.completedAssessments ? "Xem bản đồ kỹ năng & lộ trình học" : "Khám phá điểm mạnh toán học của bạn"}</strong><small>Bài đánh giá vui 10 câu, giúp chọn nội dung luyện tập phù hợp với lớp {student?.grade || 1}.</small></div><b> {student?.completedAssessments ? "Xem kết quả" : "Bắt đầu"} →</b></Link>
+      <Link to="/danh-gia" className="assessment-invite supplementary-activity"><span>🧠</span><div><strong>{student?.completedAssessments ? "Xem bản đồ kỹ năng & lộ trình học" : "Đánh giá để hiểu con cần học gì"}</strong><small>Bài đánh giá ngắn để gợi ý bài học phù hợp, không phải bài thi và không ảnh hưởng điểm ở trường.</small></div><b> {student?.completedAssessments ? "Xem kết quả" : "Làm sau"} →</b></Link>
 
-      <Link to={student?.isPremium ? "/danh-gia-tuan" : "/premium"} className="weekly-assessment-invite"><span>{student?.isPremium ? "📈" : "🔒"}</span><div><strong>Kiểm tra năng lực tuần{!student?.isPremium && " · Premium"}</strong><small>{student?.isPremium ? "Đánh giá 10 câu để điều chỉnh độ khó bài luyện tập tuần tới." : "Nâng cấp Premium để mở đánh giá tuần và điều chỉnh lộ trình."}</small></div><b>{student?.isPremium ? "Kiểm tra tuần này →" : "Tìm hiểu Premium →"}</b></Link>
+      <Link to={student?.isPremium ? "/danh-gia-tuan" : "/premium"} className="weekly-assessment-invite supplementary-activity"><span>{student?.isPremium ? "📈" : "🔒"}</span><div><strong>Điều chỉnh bài học theo tuần{!student?.isPremium && " · Premium"}</strong><small>{student?.isPremium ? "Một hoạt động ngắn giúp tuần sau có bài luyện vừa sức hơn." : "Mở tính năng cá nhân hóa độ khó bài học."}</small></div><b>{student?.isPremium ? "Làm sau" : "Tìm hiểu"}</b></Link>
 
-      <Link to="/kiem-tra-thang" className="monthly-assessment-invite"><span>🗓️</span><div><strong>Bài kiểm tra tháng</strong><small>Ôn tập kiến thức lớp {student?.grade || 1}, xem lại đáp án và nhận XP, sao.</small></div><b>Làm bài tháng này →</b></Link>
+      <Link to="/kiem-tra-thang" className="monthly-assessment-invite supplementary-activity"><span>🗓️</span><div><strong>Ôn tập cuối tháng</strong><small>Nhìn lại những điều đã học và nhận gợi ý ôn tập tiếp theo.</small></div><b>Làm sau →</b></Link>
 
       {student?.isPremium ? <section className="premium-active-card"><span className="premium-invite-crown">👑</span><div><small>PREMIUM ĐANG HOẠT ĐỘNG</small><strong>Toàn bộ hành trình học đã được mở khóa</strong><p>Lộ trình AI, bài luyện tập nâng cao và theo dõi tiến bộ đang sẵn sàng cho bạn.</p></div><span className="premium-active-date">Đến {student.premiumExpiresAt ? new Date(student.premiumExpiresAt).toLocaleDateString("vi-VN") : "đang hoạt động"}</span></section> : <Link to="/premium" className="premium-invite"><span className="premium-invite-crown">👑</span><div><small>MATHKIDS PREMIUM</small><strong>Mở khóa lộ trình học riêng cho bạn</strong><p>AI gợi ý bài học theo điểm mạnh, điểm cần luyện và mục tiêu từng ngày.</p></div><span className="premium-invite-button">Đăng ký Premium <b>→</b></span></Link>}
 
       {student?.isPremium && <section className="premium-tools"><div className="panel-heading"><div><span className="panel-kicker">ĐẶC QUYỀN PREMIUM</span><h2>Công cụ dành riêng cho bạn</h2></div><span className="premium-open-label">ĐÃ MỞ KHÓA ✓</span></div><div className="premium-tools-grid"><Link to="/danh-gia"><span>🧭</span><strong>Lộ trình AI</strong><small>Xem kế hoạch học cá nhân</small></Link><Link to="/tro-choi"><span>🚀</span><strong>Luyện tập nâng cao</strong><small>Ôn đúng phần cần cải thiện</small></Link><Link to="/danh-gia"><span>📈</span><strong>Theo dõi tiến bộ</strong><small>Cập nhật bản đồ kỹ năng</small></Link></div></section>}
 
       <div className="dashboard-columns">
-        <section className="learning-panel" id="lessons"><div className="panel-heading"><div><span className="panel-kicker">HỌC TẬP · LỚP {learningPath?.grade || grade}</span><h2>Tiếp tục hành trình</h2></div><Link to="/hoc-tap">Xem lộ trình <span>→</span></Link></div><div className="learning-list">{learningError ? <div className="learning-path-load-error" role="alert">{learningError} <button onClick={loadLearningPath}>Thử lại</button></div> : learningCards.slice(0, 3).map((card, index) => <Link className={`learning-card ${card.isCompleted ? "learning-card-completed" : ""}`} to={`/hoc-tap/${card.lessonId}`} key={card.lessonId}><span className={`learning-icon ${["coral", "violet", "mint"][index % 3]}`}>{card.isCompleted ? "✓" : ["➕", "🔷", "📏"][index % 3]}</span><span className="learning-info"><small>{card.isCompleted ? "ĐÃ HOÀN THÀNH" : `CHỦ ĐỀ · ${card.topic.name.toLocaleUpperCase("vi-VN")}`}</small><strong>{card.title}</strong><span>{card.isCompleted ? "Ôn lại bài học" : typeof card.assessmentAccuracy === "number" ? `${card.skillStatus} · ${card.assessmentSource} ${card.assessmentAccuracy}%` : card.accuracy === null ? "Bắt đầu học chủ đề này" : `Kết quả luyện tập: ${card.accuracy}% đúng`}</span></span><span className="learning-arrow">→</span></Link>)}</div></section>
+        <section className="learning-panel" id="lessons"><div className="panel-heading"><div><span className="panel-kicker">HỌC TẬP · LỚP {learningPath?.grade || grade}</span><h2>Bài học hôm nay</h2></div><Link to="/hoc-tap">Xem lộ trình <span>→</span></Link></div><p className="learning-panel-intro">Học lý thuyết, xem ví dụ rồi tự luyện theo từng bước.</p><div className="learning-list">{learningError ? <div className="learning-path-load-error" role="alert">{learningError} <button onClick={loadLearningPath}>Thử lại</button></div> : learningCards.slice(0, 3).map((card, index) => <Link className={`learning-card ${card.isCompleted ? "learning-card-completed" : ""} ${card.isLocked ? "learning-card-locked" : ""}`} to={card.isLocked ? "/hoc-tap" : `/hoc-tap/${card.lessonId}`} onClick={(event) => { if (card.isLocked) event.preventDefault(); }} key={card.lessonId}><span className={`learning-icon ${["coral", "violet", "mint"][index % 3]}`}>{card.isCompleted ? "✓" : card.isLocked ? "🔒" : ["➕", "🔷", "📏"][index % 3]}</span><span className="learning-info"><small>{card.isCompleted ? "ĐÃ HOÀN THÀNH" : card.isLocked ? "CHƯA MỞ KHÓA" : `CHỦ ĐỀ · ${card.topic.name.toLocaleUpperCase("vi-VN")}`}</small><strong>{card.title}</strong><span>{card.isCompleted ? "Ôn lại bài học" : card.isLocked ? "Hoàn thành bài phía trước để mở khóa" : typeof card.assessmentAccuracy === "number" ? `${card.skillStatus} · ${card.assessmentSource} ${card.assessmentAccuracy}%` : card.accuracy === null ? "Lý thuyết · xem ví dụ · tự luyện" : `Kết quả luyện tập: ${card.accuracy}% đúng`}</span></span><span className="learning-arrow">{card.isLocked ? "🔒" : "→"}</span></Link>)}</div></section>
         <aside className="daily-panel" id="challenge">
           <div className="daily-top"><span>☀</span><small>THỬ THÁCH HÔM NAY · LỚP {dailyChallenge?.grade || grade}</small></div>
           <h2>Khởi động trí não!</h2>
-          <p>Giải câu đố nhanh để luyện tư duy, nhận XP và sao đổi quà.</p>
+          <p>Ôn nhanh sau khi học xong bài hôm nay để nhớ lâu hơn.</p>
           {challengeLoading ? <div className="daily-question daily-question-state" role="status">Đang tải thử thách…</div> : dailyChallenge ? <>
             <div className="daily-question">
               <div className="daily-countdown" role="timer" aria-label="Thời gian đến thử thách ngày mai">

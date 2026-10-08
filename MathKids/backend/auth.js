@@ -429,7 +429,7 @@ export async function loginWithGoogle(credential, requestedRole) {
 // AUTHENTICATE JWT
 // ==========================================
 
-export function authenticate(
+export async function authenticate(
     request,
     response,
     next
@@ -456,15 +456,20 @@ export function authenticate(
     try {
 
         // Verify token
-        request.user =
-            jwt.verify(
-                token,
-                jwtSecret
-            );
-
+        request.user = jwt.verify(token, jwtSecret);
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("userId", sql.Int, request.user.userId)
+            .query("SELECT IsActive FROM [mk].[AppUser] WHERE UserId = @userId");
+        if (!result.recordset[0]?.IsActive) {
+            return response.status(401).json({ message: "Tài khoản đã bị khóa hoặc không còn hoạt động." });
+        }
         return next();
 
-    } catch {
+    } catch (error) {
+        if (error?.name !== "JsonWebTokenError" && error?.name !== "TokenExpiredError" && error?.name !== "NotBeforeError") {
+            return response.status(500).json({ message: "Không thể xác thực trạng thái tài khoản.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+        }
 
         return response
             .status(401)

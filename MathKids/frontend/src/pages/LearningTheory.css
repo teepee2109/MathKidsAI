@@ -1,0 +1,72 @@
+.learning-theory-introduction {
+  color: #31577f !important;
+  font-size: 13px !important;
+  font-weight: 800;
+}
+
+.learning-theory-points {
+  display: grid;
+  gap: 8px;
+  margin: 11px 0 0;
+  padding-left: 21px;
+  color: #435f80;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.learning-theory-points li::marker { color: #4386d4; }
+.learning-example-steps {
+  display: grid;
+  gap: 7px;
+  margin: 9px 0 0;
+  padding-left: 22px;
+  color: #435f80;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.learning-example-steps li::marker { color: #b08737; font-weight: 900; }
+
+.percentage-model {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid #d4e6fa;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.percentage-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 12px);
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.percentage-grid i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #d9e3ef;
+  border-radius: 2px;
+  background: #f5f8fc;
+}
+
+.percentage-grid i.is-filled { border-color: #3982d5; background: #5ba0ec; }
+
+.percentage-model-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #6e839d;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.percentage-model-copy strong { color: #285784; font-size: 12px; }
+
+@media (max-width: 480px) {
+  .percentage-model { align-items: flex-start; flex-direction: column; }
+  .percentage-grid { grid-template-columns: repeat(10, 10px); }
+  .percentage-grid i { width: 10px; height: 10px; }
+}

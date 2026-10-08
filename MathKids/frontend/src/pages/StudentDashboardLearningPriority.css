@@ -1,0 +1,62 @@
+.dashboard-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, .8fr);
+  gap: 20px;
+}
+
+.dashboard-content > * { grid-column: 1 / -1; }
+.dashboard-error { order: 0; }
+.welcome-banner { order: 1; }
+.dashboard-columns { order: 2; grid-column: 1; grid-row: 2; }
+.leaderboard-panel { order: 8; grid-column: 2; grid-row: 2; margin: 0; }
+.student-stats { order: 3; }
+.dashboard-earned-badges { order: 4; }
+.rewards-invite { order: 5; }
+.premium-active-card,
+.premium-invite,
+.premium-tools { order: 6; }
+.supplementary-activity { order: 7; }
+.dashboard-footer { order: 20; }
+
+.learning-panel {
+  border-color: #cfe2f4;
+  box-shadow: 0 10px 26px #2d6ca51a;
+}
+
+.learning-panel-intro {
+  margin: -7px 0 13px;
+  color: #7890a9;
+  font-size: 11px;
+}
+
+.learning-card-locked {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.learning-card-locked:hover {
+  transform: none;
+  border-color: #e2ebf3;
+}
+
+.supplementary-activity {
+  opacity: .9;
+}
+
+@media (max-width: 800px) {
+  .dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .dashboard-columns,
+  .leaderboard-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .dashboard-columns { order: 2; }
+  .leaderboard-panel { order: 8; margin: 13px 0; }
+  .learning-panel-intro { margin-top: -4px; }
+}

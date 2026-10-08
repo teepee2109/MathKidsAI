@@ -4,8 +4,46 @@ import BrandLogo from "../components/BrandLogo";
 import { getQuestions, submitQuestionAnswer } from "../services/questions";
 import { completeLesson, getLearningPath } from "../services/learning";
 import "./LearningPath.css";
+import "./LearningStudy.css";
+import "./LearningTheory.css";
 
 const icons = ["➕", "🔷", "📏", "✖️", "🕒", "🍕", "📐", "🔟", "%"];
+
+function TheoryDetails({ text }) {
+  const parts = String(text || "").split(/\s*•\s*/).filter(Boolean);
+  if (parts.length < 2) return <p>{text}</p>;
+  if (String(text || "").trimStart().startsWith("•")) {
+    return <ul className="learning-theory-points">{parts.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>;
+  }
+  const [explanation, ...points] = parts;
+  return <>
+    {explanation && <p>{explanation}</p>}
+    <ul className="learning-theory-points">{points.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>
+  </>;
+}
+
+function WorkedExampleDetails({ text }) {
+  const source = String(text || "");
+  const markers = [...source.matchAll(/(?:^|\s)(\d+)\)\s*/g)];
+  if (!markers.length) return <p>{source}</p>;
+  const introduction = source.slice(0, markers[0].index).trim();
+  const steps = markers.map((marker, index) => {
+    const start = marker.index + marker[0].length;
+    const end = markers[index + 1]?.index ?? source.length;
+    return source.slice(start, end).trim();
+  });
+  return <>
+    {introduction && <p>{introduction}</p>}
+    <ol className="learning-example-steps">{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>
+  </>;
+}
+
+function PercentageModel() {
+  return <div className="percentage-model" role="img" aria-label="Bảng 100 ô, trong đó 25 ô được tô màu để minh họa 25 phần trăm">
+    <div className="percentage-grid">{Array.from({ length: 100 }, (_, index) => <i className={index < 25 ? "is-filled" : ""} key={index} />)}</div>
+    <div className="percentage-model-copy"><strong>Hình dung phần trăm</strong><span>Toàn bộ bảng có 100 ô. 25 ô được tô màu nghĩa là 25 trong 100 phần, tức 25% — cũng bằng 1/4.</span></div>
+  </div>;
+}
 
 export default function LearningPath({ onLogout }) {
   const { lessonId } = useParams();
@@ -21,6 +59,7 @@ export default function LearningPath({ onLogout }) {
   const [practiceError, setPracticeError] = useState("");
   const [savingProgress, setSavingProgress] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
+  const [theoryRead, setTheoryRead] = useState(false);
 
   const loadPath = useCallback(async () => {
     setLoading(true);
@@ -46,11 +85,21 @@ export default function LearningPath({ onLogout }) {
 
   const lesson = useMemo(() => pathData?.lessons?.find((item) => String(item.lessonId) === lessonId), [pathData, lessonId]);
   const currentQuestion = practice[practiceIndex];
+  const practiceFinished = practice.length > 0 && practiceIndex >= practice.length;
   const selectedOptionText = currentQuestion?.options?.find((option) => option.key === answerResult?.answer)?.text;
   const correctOptionText = currentQuestion?.options?.find((option) => option.key === answerResult?.correctAnswer)?.text;
   const answerFeedback = answerResult?.feedback && !/\b(undefined|null)\b/i.test(answerResult.feedback)
     ? answerResult.feedback
     : `Em chọn ${answerResult?.answer || "?"}${selectedOptionText ? `: “${selectedOptionText}”` : ""}. Đáp án đúng ${answerResult?.correctAnswer || "?"}${correctOptionText ? `: “${correctOptionText}”` : ""}. Cách giải: ${answerResult?.explanation || "Hãy xem lại lý thuyết và tính lại từng bước."}`;
+
+  useEffect(() => {
+    setTheoryRead(false);
+    setPractice([]);
+    setPracticeIndex(0);
+    setAnswerResult(null);
+    setCorrectCount(0);
+    setProgressMessage("");
+  }, [lessonId]);
 
   async function startPractice() {
     if (!lesson || practiceLoading) return;
@@ -128,17 +177,19 @@ export default function LearningPath({ onLogout }) {
         <div className="learning-path-layout">
           <section className="learning-path-list" aria-label="Danh sách bài học">
             <div className="learning-recommendation"><span>🧭</span><div><small>BÀI HỌC ĐƯỢC GỢI Ý</small><strong>{pathData.lessons.find((item) => item.lessonId === pathData.recommendedLessonId)?.title || "Bạn đã hoàn thành lộ trình!"}</strong><p>{pathData.recommendation}</p></div></div>
-            {pathData.lessons.map((item, index) => <Link key={item.lessonId} to={`/hoc-tap/${item.lessonId}`} className={`learning-path-item ${String(item.lessonId) === lessonId ? "is-selected" : ""} ${item.isCompleted ? "is-completed" : ""}`}><span className="learning-step-number">{item.isCompleted ? "✓" : String(index + 1).padStart(2, "0")}</span><span className="learning-step-copy"><small>CHỦ ĐỀ · {item.topic.name.toLocaleUpperCase("vi-VN")}</small><strong>{item.title}</strong><span>{item.isCompleted ? "Đã hoàn thành" : item.lessonId === pathData.recommendedLessonId ? pathData.recommendation : typeof item.assessmentAccuracy === "number" ? `${item.skillStatus} · ${item.assessmentSource} ${item.assessmentAccuracy}%` : "Bài học theo chương trình lớp bạn"}</span></span><span className="learning-step-arrow">→</span></Link>)}
+            {pathData.lessons.map((item, index) => <Link key={item.lessonId} to={item.isLocked ? "/hoc-tap" : `/hoc-tap/${item.lessonId}`} aria-disabled={item.isLocked} onClick={(event) => { if (item.isLocked) event.preventDefault(); }} className={`learning-path-item ${String(item.lessonId) === lessonId ? "is-selected" : ""} ${item.isCompleted ? "is-completed" : ""} ${item.isLocked ? "is-locked" : ""}`}><span className="learning-step-number">{item.isCompleted ? "✓" : item.isLocked ? "🔒" : String(index + 1).padStart(2, "0")}</span><span className="learning-step-copy"><small>CHỦ ĐỀ · {item.topic.name.toLocaleUpperCase("vi-VN")}</small><strong>{item.title}</strong><span>{item.isCompleted ? "Đã hoàn thành" : item.isLocked ? "Hoàn thành bài phía trước để mở khóa" : item.lessonId === pathData.recommendedLessonId ? pathData.recommendation : typeof item.assessmentAccuracy === "number" ? `${item.skillStatus} · ${item.assessmentSource} ${item.assessmentAccuracy}%` : "Bài học theo chương trình lớp bạn"}</span></span><span className="learning-step-arrow">{item.isLocked ? "🔒" : "→"}</span></Link>)}
           </section>
 
           <section className="learning-lesson-card">
-            {!lesson ? <div className="learning-empty"><span>{lessonId ? "🔎" : "📖"}</span><h2>{lessonId ? "Không tìm thấy bài học" : "Chọn một bài để bắt đầu"}</h2><p>{lessonId ? "Bài học này không thuộc lớp hiện tại hoặc đã được gỡ khỏi lộ trình." : "Đọc nội dung, xem ví dụ từng bước rồi luyện vài câu hỏi để củng cố kiến thức."}</p>{lessonId && <Link to="/hoc-tap" className="learning-primary">Quay lại lộ trình</Link>}</div> : <>
+            {!lesson ? <div className="learning-empty"><span>{lessonId ? "🔎" : "📖"}</span><h2>{lessonId ? "Không tìm thấy bài học" : "Chọn một bài để bắt đầu"}</h2><p>{lessonId ? "Bài học này không thuộc lớp hiện tại hoặc đã được gỡ khỏi lộ trình." : "Đọc nội dung, xem ví dụ từng bước rồi luyện vài câu hỏi để củng cố kiến thức."}</p>{lessonId && <Link to="/hoc-tap" className="learning-primary">Quay lại lộ trình</Link>}</div> : lesson.isLocked ? <div className="learning-empty learning-locked-empty"><span>🔒</span><h2>Bài học chưa được mở khóa</h2><p>Em hãy hoàn thành các bài học phía trước theo thứ tự. Khi hoàn thành bài hiện tại, bài tiếp theo sẽ tự động mở.</p><Link to="/hoc-tap" className="learning-primary">Quay lại danh sách bài</Link></div> : <>
               <div className="learning-lesson-top"><span className="learning-lesson-icon">{icons[lesson.sortOrder - 1] || "📘"}</span><span className="learning-kicker">BÀI HỌC · {lesson.topic.name.toLocaleUpperCase("vi-VN")}</span>{lesson.isCompleted && <span className="learning-done-chip">✓ ĐÃ HOÀN THÀNH</span>}</div>
-              <h2>{lesson.title}</h2><p className="learning-introduction">{lesson.introduction}</p>
-              <article className="learning-concept"><small>LÝ THUYẾT · Ý CHÍNH CẦN NHỚ</small><p>{lesson.keyConcept}</p></article>
-              <article className="learning-example"><small>VÍ DỤ TỪNG BƯỚC</small><p>{lesson.workedExample}</p></article>
-              <section className="learning-practice"><div className="learning-practice-heading"><span>✏️</span><div><strong>Luyện tập để ghi nhớ</strong><small>Câu hỏi lớp {pathData.grade} · mức { ["", "cơ bản", "trung bình", "nâng cao"][lesson.recommendedDifficulty || pathData.recommendedDifficulty || 1] }{lesson.assessmentSource ? ` theo ${lesson.assessmentSource.toLowerCase()}` : " phù hợp chương trình"}</small></div></div>
-                {practice.length === 0 ? <button className="learning-primary" onClick={startPractice} disabled={practiceLoading}>{practiceLoading ? "Đang tải câu hỏi…" : "Bắt đầu luyện tập →"}</button> : practiceIndex >= practice.length ? <div className="learning-practice-finished" role="status"><strong>Hoàn thành phần luyện tập!</strong><span>Đúng {correctCount}/{practice.length} câu. Hãy cập nhật tiến độ để ghi nhận bài đã học.</span></div> : <>
+              <h2>{lesson.title}</h2>
+              <div className="learning-study-steps" aria-label="Các bước học bài"><span className="is-active">1. Học lý thuyết</span><span className={theoryRead ? "is-active" : ""}>2. Xem ví dụ</span><span className={practice.length > 0 || practiceIndex >= practice.length ? "is-active" : ""}>3. Tự luyện</span></div>
+              <article className="learning-concept"><small>📖 LÝ THUYẾT · HIỂU Ý NGHĨA</small><h3>Kiến thức cần học</h3><p className="learning-theory-introduction">{lesson.introduction}</p><TheoryDetails text={lesson.keyConcept} />{lesson.topic.code === "percentage" && <PercentageModel />}</article>
+              <article className="learning-example"><small>🔎 VÍ DỤ · ÁP DỤNG KIẾN THỨC</small><h3>Cùng làm từng bước</h3><WorkedExampleDetails text={lesson.workedExample} /></article>
+              <section className="learning-understanding"><strong>💡 Cách học hiệu quả</strong><ol><li>Đọc chậm phần lý thuyết và tìm từ khóa quan trọng.</li><li>Che kết quả trong ví dụ, tự làm lại trên giấy.</li><li>Nói lại quy tắc bằng lời của mình trước khi luyện tập.</li></ol><button className="learning-understood" onClick={() => setTheoryRead(true)}>{theoryRead ? "✓ Em đã hiểu phần bài học" : "✓ Em đã đọc và hiểu lý thuyết"}</button></section>
+              <section className={`learning-practice ${!theoryRead ? "is-locked" : ""}`}><div className="learning-practice-heading"><span>✏️</span><div><strong>Phần tự luyện</strong><small>{!theoryRead ? "Hãy học lý thuyết và xem ví dụ trước" : `3 câu luyện tập lớp ${pathData.grade} · mức ${ ["", "cơ bản", "trung bình", "nâng cao"][lesson.recommendedDifficulty || pathData.recommendedDifficulty || 1] }`}</small></div></div>
+                {!theoryRead ? <div className="learning-practice-locked">🔒 Phần luyện tập sẽ mở sau khi em hoàn thành phần học ở trên.</div> : practice.length === 0 ? <button className="learning-primary" onClick={startPractice} disabled={practiceLoading}>{practiceLoading ? "Đang chuẩn bị bài luyện…" : "Bắt đầu tự luyện →"}</button> : practiceIndex >= practice.length ? <div className="learning-practice-finished" role="status"><strong>Hoàn thành phần tự luyện!</strong><span>Đúng {correctCount}/{practice.length} câu. Hãy xem lại lời giải rồi cập nhật tiến độ bài học.</span></div> : <>
                   <div className="learning-practice-progress">CÂU {practiceIndex + 1} / {practice.length}</div><p className="learning-practice-question">{currentQuestion.questionText}</p>
                   <div className="learning-practice-options">{currentQuestion.options.map((option) => <button key={option.key} disabled={Boolean(answerResult) || answerSubmitting} className={answerResult ? option.key === answerResult.correctAnswer ? "is-correct" : "is-muted" : ""} onClick={() => answerQuestion(option.key)}><b>{option.key}</b>{option.text}</button>)}</div>
                   {answerSubmitting && <small className="learning-submitting" role="status">Đang kiểm tra đáp án…</small>}
@@ -147,7 +198,7 @@ export default function LearningPath({ onLogout }) {
               </section>
               {practiceError && <p className="learning-alert learning-inline-alert" role="alert">{practiceError}</p>}
               {progressMessage && <p className="learning-progress-success" role="status">{progressMessage}</p>}
-              <div className="learning-lesson-actions"><Link to="/hoc-tap">← Danh sách bài</Link><button className="learning-primary" onClick={markComplete} disabled={savingProgress || lesson.isCompleted}>{savingProgress ? "Đang lưu…" : lesson.isCompleted ? "Đã hoàn thành ✓" : "Đánh dấu đã học xong ✓"}</button></div>
+              <div className="learning-lesson-actions"><Link to="/hoc-tap">← Danh sách bài</Link><div className="learning-complete-action"><button className="learning-primary" onClick={markComplete} disabled={savingProgress || lesson.isCompleted || !theoryRead || !practiceFinished}>{savingProgress ? "Đang lưu…" : lesson.isCompleted ? "Đã hoàn thành ✓" : "Đánh dấu đã học xong ✓"}</button>{!lesson.isCompleted && (!theoryRead || !practiceFinished) && <small>Đọc lý thuyết và hoàn thành 3 câu tự luyện để mở nút này.</small>}</div></div>
             </>}
           </section>
         </div>

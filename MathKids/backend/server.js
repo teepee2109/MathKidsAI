@@ -24,7 +24,7 @@ const premiumPrice = 99000;
 const premiumDays = 30;
 const sepayCheckoutUrl = process.env.SEPAY_ENVIRONMENT === "production" ? "https://pay.sepay.vn/v1/checkout/init" : "https://pay-sandbox.sepay.vn/v1/checkout/init";
 const sepayApiUrl = process.env.SEPAY_ENVIRONMENT === "production" ? "https://pgapi.sepay.vn" : "https://pgapi-sandbox.sepay.vn";
-const publicAppUrl = (process.env.PUBLIC_APP_URL || "http://localhost:5173").replace(/\/$/, "");
+const publicAppUrl = (process.env.PUBLIC_APP_URL || "http://localhost:5174").replace(/\/$/, "");
 const publicApiUrl = (process.env.PUBLIC_API_URL || `http://localhost:${port}`).replace(/\/$/, "");
 let dailyChallengeSchemaPromise;
 let questionBankSchemaPromise;
@@ -613,7 +613,7 @@ async function persistPlacementLearningPath(pool, studentId, attemptId, grade, s
   }
 }
 
-app.use(cors({ origin: process.env.NODE_ENV === "production" ? (process.env.FRONTEND_ORIGIN || "http://localhost:5173") : true }));
+app.use(cors({ origin: process.env.NODE_ENV === "production" ? (process.env.FRONTEND_ORIGIN || "http://localhost:5174") : true }));
 app.use(express.json({ limit: "7mb" }));
 
 // Keep authentication compatible with older frontend builds that used either
@@ -930,6 +930,176 @@ app.get("/api/admin/dashboard", authenticate, requireAdmin, async (_request, res
     });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải dashboard quản trị.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.get("/api/admin/users", authenticate, requireAdmin, async (request, response) => {
+  try {
+    const pool = await getPool();
+    const search = String(request.query.search || "").trim().slice(0, 120);
+    const role = ["Student", "Parent", "Admin", "Teacher"].includes(request.query.role) ? request.query.role : "";
+    const status = ["active", "inactive"].includes(request.query.status) ? request.query.status : "";
+    const page = Math.max(1, Math.min(100000, Number.parseInt(request.query.page, 10) || 1));
+    const pageSize = 20;
+    const filters = `(@search = N'' OR u.Email LIKE N'%' + @search + N'%' OR u.DisplayName LIKE N'%' + @search + N'%')
+      AND (@role = '' OR u.UserRole = @role)
+      AND (@status = '' OR (@status = 'active' AND u.IsActive = 1) OR (@status = 'inactive' AND u.IsActive = 0))`;
+    const bind = (query) => query.input("search", sql.NVarChar(120), search)
+      .input("role", sql.VarChar(20), role).input("status", sql.VarChar(10), status);
+    const countResult = await bind(pool.request()).query(`SELECT COUNT_BIG(*) AS Total FROM [mk].[AppUser] u WHERE ${filters}`);
+    const usersResult = await bind(pool.request())
+      .input("offset", sql.Int, (page - 1) * pageSize).input("pageSize", sql.Int, pageSize)
+      .query(`SELECT u.UserId, u.DisplayName, u.Email, u.UserRole, u.IsActive, u.CreatedAt, s.Grade
+              FROM [mk].[AppUser] u LEFT JOIN [mk].[Student] s ON s.StudentId = u.UserId
+              WHERE ${filters} ORDER BY u.CreatedAt DESC, u.UserId DESC
+              OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`);
+    const total = Number(countResult.recordset[0].Total);
+    return response.json({ users: usersResult.recordset.map((user) => ({
+      id: user.UserId, name: user.DisplayName, email: user.Email, role: user.UserRole,
+      active: Boolean(user.IsActive), grade: user.Grade, createdAt: user.CreatedAt,
+    })), page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải danh sách tài khoản.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.get("/api/admin/reports/overview", authenticate, requireAdmin, async (request, response) => {
+  const days = [7, 30, 90].includes(Number(request.query.days)) ? Number(request.query.days) : 30;
+  try {
+    await ensureLearningPathSchema();
+    await ensureWeeklyAssessmentSchema();
+    await ensureMonthlyAssessmentSchema();
+    const pool = await getPool();
+    const summaryResult = await pool.request().input("days", sql.Int, days).query(`
+      SELECT
+        (SELECT COUNT_BIG(*) FROM [mk].[AppUser]) AS TotalUsers,
+        (SELECT COUNT_BIG(*) FROM [mk].[AppUser] WHERE IsActive = 1) AS ActiveUsers,
+        (SELECT COUNT_BIG(*) FROM [mk].[Student]) AS Students,
+        (SELECT COUNT_BIG(*) FROM [mk].[AppUser] WHERE CreatedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS NewUsers,
+        (SELECT COUNT_BIG(*) FROM [mk].[LessonAttempt] WHERE Status = 'Completed' AND SubmittedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS CompletedLessons,
+        (SELECT COUNT_BIG(*) FROM [mk].[StudentQuestionResults] WHERE CreatedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS AnsweredQuestions,
+        (SELECT COUNT_BIG(*) FROM [mk].[PlacementAttempt] WHERE SubmittedAt IS NOT NULL AND SubmittedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS PlacementTests,
+        (SELECT COUNT_BIG(*) FROM [mk].[WeeklyAssessmentAttempt] WHERE SubmittedAt IS NOT NULL AND SubmittedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS WeeklyTests,
+        (SELECT COUNT_BIG(*) FROM [mk].[MonthlyAssessmentAttempt] WHERE SubmittedAt IS NOT NULL AND SubmittedAt >= DATEADD(day, -@days, SYSUTCDATETIME())) AS MonthlyTests,
+        (SELECT COUNT_BIG(*) FROM (
+          SELECT StudentId FROM [mk].[LessonAttempt] WHERE StartedAt >= DATEADD(day, -@days, SYSUTCDATETIME())
+          UNION SELECT StudentId FROM [mk].[StudentQuestionResults] WHERE CreatedAt >= DATEADD(day, -@days, SYSUTCDATETIME())
+          UNION SELECT StudentId FROM [mk].[PlacementAttempt] WHERE StartedAt >= DATEADD(day, -@days, SYSUTCDATETIME())
+          UNION SELECT StudentId FROM [mk].[WeeklyAssessmentAttempt] WHERE StartedAt >= DATEADD(day, -@days, SYSUTCDATETIME())
+          UNION SELECT StudentId FROM [mk].[MonthlyAssessmentAttempt] WHERE StartedAt >= DATEADD(day, -@days, SYSUTCDATETIME())
+        ) AS ActiveLearners) AS ActiveLearners
+    `);
+    const gradeResult = await pool.request().query(`
+      SELECT Grade AS grade, COUNT_BIG(*) AS students
+      FROM [mk].[Student] GROUP BY Grade ORDER BY Grade
+    `);
+    const revenueResult = await pool.request().input("days", sql.Int, days).query(`
+      SELECT
+        ISNULL(SUM(CASE WHEN po.Status = 'Paid' AND po.PaidAt >= DATEADD(day, -@days, SYSUTCDATETIME()) THEN po.Amount ELSE 0 END), 0) AS Revenue,
+        SUM(CASE WHEN po.Status = 'Paid' AND po.PaidAt >= DATEADD(day, -@days, SYSUTCDATETIME()) THEN 1 ELSE 0 END) AS PaidOrders,
+        SUM(CASE WHEN po.Status = 'Pending' AND po.CreatedAt >= DATEADD(day, -@days, SYSUTCDATETIME()) THEN 1 ELSE 0 END) AS PendingOrders,
+        (SELECT COUNT(DISTINCT ps.UserId) FROM [mk].[PremiumSubscription] ps
+         WHERE ps.Status = 'Active' AND ps.ExpiresAt > SYSUTCDATETIME() AND ps.PlanCode <> 'PREMIUM_DEMO') AS ActivePremiumUsers
+      FROM [mk].[PaymentOrder] po
+      WHERE NOT EXISTS (SELECT 1 FROM [mk].[PremiumSubscription] demo
+                        WHERE demo.PaymentOrderId = po.PaymentOrderId AND demo.PlanCode = 'PREMIUM_DEMO')
+    `);
+    const dailyRevenueResult = await pool.request().input("days", sql.Int, days).query(`
+      ;WITH Calendar AS (
+        SELECT CONVERT(date, DATEADD(day, 1 - @days, CONVERT(date, SYSUTCDATETIME()))) AS RevenueDate
+        UNION ALL
+        SELECT DATEADD(day, 1, RevenueDate) FROM Calendar
+        WHERE RevenueDate < CONVERT(date, SYSUTCDATETIME())
+      )
+      SELECT CONVERT(char(10), c.RevenueDate, 23) AS date,
+        ISNULL(SUM(po.Amount), 0) AS revenue,
+        COUNT(po.PaymentOrderId) AS paidOrders
+      FROM Calendar c
+      LEFT JOIN [mk].[PaymentOrder] po ON po.Status = 'Paid'
+        AND po.PaidAt >= c.RevenueDate AND po.PaidAt < DATEADD(day, 1, c.RevenueDate)
+        AND NOT EXISTS (SELECT 1 FROM [mk].[PremiumSubscription] demo
+                        WHERE demo.PaymentOrderId = po.PaymentOrderId AND demo.PlanCode = 'PREMIUM_DEMO')
+      GROUP BY c.RevenueDate ORDER BY c.RevenueDate
+      OPTION (MAXRECURSION 100)
+    `);
+    const recentPaymentsResult = await pool.request().query(`
+      SELECT TOP (10) po.PaymentOrderId AS id, po.InvoiceNumber AS invoiceNumber,
+        po.Amount AS amount, po.Status AS status, po.CreatedAt AS createdAt, po.PaidAt AS paidAt
+      FROM [mk].[PaymentOrder] po
+      WHERE NOT EXISTS (SELECT 1 FROM [mk].[PremiumSubscription] demo
+                        WHERE demo.PaymentOrderId = po.PaymentOrderId AND demo.PlanCode = 'PREMIUM_DEMO')
+      ORDER BY po.CreatedAt DESC
+    `);
+    const activityResult = await pool.request().input("days", sql.Int, days).query(`
+      ;WITH Calendar AS (
+        SELECT CONVERT(date, DATEADD(day, 1 - @days, CONVERT(date, SYSUTCDATETIME()))) AS ActivityDate
+        UNION ALL
+        SELECT DATEADD(day, 1, ActivityDate) FROM Calendar
+        WHERE ActivityDate < CONVERT(date, SYSUTCDATETIME())
+      )
+      SELECT CONVERT(char(10), c.ActivityDate, 23) AS date,
+        (SELECT COUNT_BIG(*) FROM [mk].[AppUser] u WHERE u.CreatedAt >= c.ActivityDate AND u.CreatedAt < DATEADD(day,1,c.ActivityDate)) AS registrations,
+        (SELECT COUNT_BIG(*) FROM [mk].[LessonAttempt] a WHERE a.Status='Completed' AND a.SubmittedAt >= c.ActivityDate AND a.SubmittedAt < DATEADD(day,1,c.ActivityDate)) AS lessons,
+        (SELECT COUNT_BIG(*) FROM [mk].[StudentQuestionResults] q WHERE q.CreatedAt >= c.ActivityDate AND q.CreatedAt < DATEADD(day,1,c.ActivityDate)) AS answers,
+        (SELECT COUNT_BIG(*) FROM [mk].[PlacementAttempt] a WHERE a.SubmittedAt >= c.ActivityDate AND a.SubmittedAt < DATEADD(day,1,c.ActivityDate))
+          + (SELECT COUNT_BIG(*) FROM [mk].[WeeklyAssessmentAttempt] a WHERE a.SubmittedAt >= c.ActivityDate AND a.SubmittedAt < DATEADD(day,1,c.ActivityDate))
+          + (SELECT COUNT_BIG(*) FROM [mk].[MonthlyAssessmentAttempt] a WHERE a.SubmittedAt >= c.ActivityDate AND a.SubmittedAt < DATEADD(day,1,c.ActivityDate)) AS assessments
+      FROM Calendar c ORDER BY c.ActivityDate
+      OPTION (MAXRECURSION 100)
+    `);
+    const summary = summaryResult.recordset[0];
+    return response.json({
+      days,
+      summary: Object.fromEntries(Object.entries(summary).map(([key, value]) => [key.charAt(0).toLowerCase() + key.slice(1), Number(value)])),
+      grades: gradeResult.recordset.map((row) => ({ grade: Number(row.grade), students: Number(row.students) })),
+      activity: activityResult.recordset.map((row) => ({ date: row.date, registrations: Number(row.registrations), lessons: Number(row.lessons), answers: Number(row.answers), assessments: Number(row.assessments) })),
+      revenue: {
+        total: Number(revenueResult.recordset[0].Revenue || 0),
+        paidOrders: Number(revenueResult.recordset[0].PaidOrders || 0),
+        pendingOrders: Number(revenueResult.recordset[0].PendingOrders || 0),
+        activePremiumUsers: Number(revenueResult.recordset[0].ActivePremiumUsers || 0),
+        daily: dailyRevenueResult.recordset.map((row) => ({ date: row.date, amount: Number(row.revenue), orders: Number(row.paidOrders) })),
+        recentPayments: recentPaymentsResult.recordset.map((row) => ({ id: Number(row.id), invoiceNumber: row.invoiceNumber, amount: Number(row.amount), status: row.status, createdAt: row.createdAt, paidAt: row.paidAt })),
+      },
+    });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tạo báo cáo quản trị.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.patch("/api/admin/users/:userId/status", authenticate, requireAdmin, async (request, response) => {
+  const userId = Number(request.params.userId);
+  const isActive = request.body?.active;
+  if (!Number.isSafeInteger(userId) || userId < 1 || typeof isActive !== "boolean") {
+    return response.status(400).json({ message: "Tài khoản hoặc trạng thái không hợp lệ." });
+  }
+  if (userId === request.user.userId && !isActive) return response.status(400).json({ message: "Bạn không thể tự khóa tài khoản quản trị của mình." });
+  let transaction;
+  try {
+    const pool = await getPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const targetResult = await transaction.request().input("userId", sql.Int, userId)
+      .query("SELECT UserId, UserRole, IsActive FROM [mk].[AppUser] WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @userId");
+    const target = targetResult.recordset[0];
+    if (!target) {
+      await transaction.rollback();
+      return response.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+    if (!isActive && target.UserRole === "Admin" && target.IsActive) {
+      const adminResult = await transaction.request().query("SELECT COUNT(*) AS ActiveAdmins FROM [mk].[AppUser] WITH (UPDLOCK, HOLDLOCK) WHERE UserRole = 'Admin' AND IsActive = 1");
+      if (Number(adminResult.recordset[0].ActiveAdmins) <= 1) {
+        await transaction.rollback();
+        return response.status(409).json({ message: "Không thể khóa Admin cuối cùng đang hoạt động." });
+      }
+    }
+    await transaction.request().input("userId", sql.Int, userId).input("isActive", sql.Bit, isActive)
+      .query("UPDATE [mk].[AppUser] SET IsActive = @isActive, UpdatedAt = SYSUTCDATETIME() WHERE UserId = @userId");
+    await transaction.commit();
+    return response.json({ message: isActive ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản.", userId, active: isActive });
+  } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
+    return response.status(500).json({ message: "Không thể cập nhật trạng thái tài khoản.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
 });
 
@@ -1866,6 +2036,10 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
     }
     const roadmapOrder = new Map(roadmapLessonIds.map((id, index) => [id, index]));
     lessons.sort((a, b) => {
+      // Học sinh đi theo trình tự chương trình: từ nền tảng đến nâng cao.
+      // Kết quả đánh giá chỉ điều chỉnh độ khó câu luyện tập trong bài,
+      // không được làm đảo thứ tự mở khóa bài học.
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
       const aRank = roadmapOrder.has(a.lessonId) ? roadmapOrder.get(a.lessonId) : Number.MAX_SAFE_INTEGER;
       const bRank = roadmapOrder.has(b.lessonId) ? roadmapOrder.get(b.lessonId) : Number.MAX_SAFE_INTEGER;
       if (aRank !== bRank) return aRank - bRank;
@@ -1877,6 +2051,12 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       if (a.isCompleted !== b.isCompleted) return a.isCompleted ? 1 : -1;
       if (a.accuracy !== null && b.accuracy !== null && a.accuracy !== b.accuracy) return a.accuracy - b.accuracy;
       return a.sortOrder - b.sortOrder;
+    });
+    let previousCompleted = true;
+    lessons.forEach((lesson, index) => {
+      lesson.sequence = index + 1;
+      lesson.isLocked = !previousCompleted;
+      previousCompleted = lesson.isCompleted;
     });
     const recommended = lessons.find((lesson) => !lesson.isCompleted);
     const latestRoadmap = roadmapResult.recordset[0];
@@ -1931,8 +2111,22 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
           INNER JOIN [mk].[Lessons] l ON l.LessonId = @lessonId AND l.IsActive = 1
           INNER JOIN [mk].[Topics] t ON t.TopicId = l.TopicId AND t.GradeId = s.Grade
           WHERE s.StudentId = @studentId
+            AND NOT EXISTS (
+              SELECT 1
+              FROM [mk].[Lessons] previousLesson
+              INNER JOIN [mk].[Topics] previousTopic ON previousTopic.TopicId = previousLesson.TopicId AND previousTopic.GradeId = s.Grade
+              LEFT JOIN [mk].[StudentLessonProgress] previousProgress ON previousProgress.StudentId = @studentId AND previousProgress.LessonId = previousLesson.LessonId
+              WHERE previousLesson.IsActive = 1
+                AND previousLesson.SortOrder < l.SortOrder
+                AND ISNULL(previousProgress.IsCompleted, 0) = 0
+            )
         )
-          SELECT CAST(0 AS BIT) AS IsAvailable, CAST(0 AS BIT) AS WasCompleted, CAST(NULL AS DATETIME2) AS CompletedAt;
+          SELECT CAST(0 AS BIT) AS IsAvailable, CAST(0 AS BIT) AS WasCompleted, CAST(NULL AS DATETIME2) AS CompletedAt, CAST(0 AS INT) AS PracticeCount,
+                 CASE WHEN EXISTS (
+                   SELECT 1 FROM [mk].[Student] s2 INNER JOIN [mk].[Lessons] blockedLesson ON blockedLesson.LessonId = @lessonId
+                   INNER JOIN [mk].[Topics] blockedTopic ON blockedTopic.TopicId = blockedLesson.TopicId AND blockedTopic.GradeId = s2.Grade
+                   WHERE s2.StudentId = @studentId
+                 ) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsLocked;
         ELSE
         BEGIN
           DECLARE @wasCompleted BIT = 0;
@@ -1944,14 +2138,24 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
             ON target.StudentId = source.StudentId AND target.LessonId = source.LessonId
             WHEN MATCHED THEN UPDATE SET IsCompleted = 1, CompletedAt = SYSUTCDATETIME(), UpdatedAt = SYSUTCDATETIME()
             WHEN NOT MATCHED THEN INSERT (StudentId, LessonId, IsCompleted, CompletedAt) VALUES (source.StudentId, source.LessonId, 1, SYSUTCDATETIME());
-          SELECT CAST(1 AS BIT) AS IsAvailable, @wasCompleted AS WasCompleted, CompletedAt
-          FROM [mk].[StudentLessonProgress] WHERE StudentId = @studentId AND LessonId = @lessonId;
+          SELECT CAST(1 AS BIT) AS IsAvailable, @wasCompleted AS WasCompleted, CompletedAt,
+                 (SELECT COUNT(*) FROM [mk].[StudentQuestionResults] results
+                  INNER JOIN [mk].[Questions] practiceQuestion ON practiceQuestion.QuestionId = results.QuestionId
+                  WHERE results.StudentId = @studentId AND results.ActivityType = 'Lesson' AND practiceQuestion.TopicId = l.TopicId) AS PracticeCount
+          FROM [mk].[StudentLessonProgress] progress
+          INNER JOIN [mk].[Lessons] l ON l.LessonId = @lessonId
+          WHERE progress.StudentId = @studentId AND progress.LessonId = @lessonId;
         END
       `);
     const progress = result.recordset[0];
     if (!progress?.IsAvailable) {
       await transaction.rollback();
+      if (progress?.IsLocked) return response.status(409).json({ message: "Hãy hoàn thành các bài học phía trước để mở khóa bài này." });
       return response.status(404).json({ message: "Không tìm thấy bài học của lớp bạn." });
+    }
+    if (!progress.WasCompleted && Number(progress.PracticeCount || 0) < 3) {
+      await transaction.rollback();
+      return response.status(409).json({ message: "Em cần đọc lý thuyết, xem ví dụ và hoàn thành 3 câu tự luyện trước khi đánh dấu bài học." });
     }
     await transaction.commit();
     return response.json({ message: progress.WasCompleted ? "Bài học này đã được hoàn thành trước đó." : "Đã lưu bài học hoàn thành!", isCompleted: true, completedAt: progress.CompletedAt });
@@ -2445,6 +2649,8 @@ app.get("/api/students/me/leaderboard", authenticate, async (request, response) 
       topStudents: result.recordset.map((row, index) => ({
         rank: index + 1, name: row.DisplayName,
         grade: Number(row.Grade), totalXp: Number(row.TotalXp), totalStars: Number(row.TotalStars),
+        badges: xpBadges.filter((badge) => Number(row.TotalXp) >= badge.threshold)
+          .map(({ code, name, icon, threshold }) => ({ code, name, icon, threshold })),
       })),
     });
   } catch (error) {
