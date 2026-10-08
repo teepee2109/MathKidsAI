@@ -1,0 +1,244 @@
+.bug-report-trigger {
+  position: fixed;
+  left: 22px;
+  bottom: 20px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 15px;
+  border: 1px solid #d9e6f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #315c89;
+  box-shadow: 0 8px 25px #244d751c;
+  font: 900 12px 'Nunito', sans-serif;
+  cursor: pointer;
+  transition:
+    transform .18s,
+    box-shadow .18s,
+    border-color .18s;
+}
+
+.bug-report-trigger:hover {
+  transform: translateY(-2px);
+  border-color: #9ec7ef;
+  box-shadow: 0 12px 30px #244d7528;
+}
+
+.bug-report-trigger span:first-child {
+  font-size: 16px;
+}
+
+.bug-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #16385866;
+  backdrop-filter: blur(5px);
+}
+
+.bug-report-modal {
+  width: min(720px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  border: 1px solid #e2ebf5;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 25px 80px #173c6b3d;
+  color: #355473;
+  font-family: 'Nunito', sans-serif;
+}
+
+.bug-report-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px 18px;
+  border-bottom: 1px solid #edf2f7;
+  background: linear-gradient(
+    135deg,
+    #f4faff,
+    #fff
+  );
+}
+
+.bug-report-kicker {
+  color: #4386c8;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: 1.3px;
+}
+
+.bug-report-header h2 {
+  margin: 3px 0 3px;
+  color: #214f86;
+  font: 800 27px 'Baloo 2', cursive;
+}
+
+.bug-report-header p {
+  margin: 0;
+  color: #8295aa;
+  font-size: 11px;
+}
+
+.bug-report-close {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1f6fb;
+  color: #6b849e;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bug-report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 26px 24px;
+}
+
+.bug-report-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #466581;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.bug-report-form label > span {
+  color: #d65a5a;
+}
+
+.bug-report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+
+.bug-report-form input,
+.bug-report-form select,
+.bug-report-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #dce7f2;
+  border-radius: 11px;
+  background: #fbfdff;
+  color: #355473;
+  padding: 10px 11px;
+  outline: 0;
+  font: 700 11px 'Nunito', sans-serif;
+  transition:
+    border-color .15s,
+    box-shadow .15s;
+}
+
+.bug-report-form input:focus,
+.bug-report-form select:focus,
+.bug-report-form textarea:focus {
+  border-color: #6da7dd;
+  box-shadow: 0 0 0 3px #dcebfa;
+}
+
+.bug-report-form textarea {
+  resize: vertical;
+  line-height: 1.5;
+  min-height: 72px;
+}
+
+.bug-report-status {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.bug-report-status.success {
+  background: #eaf9f0;
+  color: #21804f;
+}
+
+.bug-report-status.error {
+  background: #fff0f0;
+  color: #bd4747;
+}
+
+.bug-report-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: #8b9caf;
+  font-size: 9px;
+}
+
+.bug-report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 2px;
+}
+
+.bug-report-actions button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  font: 900 11px 'Nunito', sans-serif;
+  cursor: pointer;
+}
+
+.bug-report-secondary {
+  background: #edf3f9;
+  color: #56718d;
+}
+
+.bug-report-submit {
+  background: #347fdf;
+  color: #fff;
+  box-shadow: 0 6px 14px #347fdf33;
+}
+
+.bug-report-actions button:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+@media (max-width: 620px) {
+  .bug-report-trigger {
+    left: 12px;
+    bottom: 12px;
+  }
+
+  .bug-report-overlay {
+    padding: 10px;
+  }
+
+  .bug-report-modal {
+    max-height: 94vh;
+    border-radius: 18px;
+  }
+
+  .bug-report-header,
+  .bug-report-form {
+    padding-left: 17px;
+    padding-right: 17px;
+  }
+
+  .bug-report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bug-report-actions {
+    flex-direction: column-reverse;
+  }
+
+  .bug-report-actions button {
+    width: 100%;
+  }
+}

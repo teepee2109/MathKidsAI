@@ -21,6 +21,8 @@ import Contact from "./pages/Contact";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { clearAuthSession, getAuthToken, getCachedUser } from "./authStorage";
+import BugReportButton from "./components/BugReportButton";
+
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -45,7 +47,9 @@ function AppRoutes() {
     ? "/parent/dashboard"
     : "/dashboard";
 
-  return <Routes>
+  return (
+  <>
+  <Routes>
     <Route path="/" element={isAuthenticated ? <Navigate to={dashboardPath} replace /> : <Landing />} />
     <Route path="/home" element={<Home isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
     <Route path="/dashboard" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : currentUser?.role === "Parent" ? <Navigate to="/parent/dashboard" replace /> : <StudentDashboard onLogout={handleLogout} />} />
@@ -72,13 +76,21 @@ function AppRoutes() {
     <Route path="/lien-he" element={<Contact />} />
     <Route path="/contact" element={<Navigate to="/lien-he" replace />} />
     <Route path="*" element={<Navigate to={isAuthenticated ? dashboardPath : "/"} replace />} />
-  </Routes>;
+  </Routes>
+  <BugReportButton currentUser={currentUser} />
+  </>
+  
+);
 }
+
+
 
 function LearningPathRoute({ onLogout }) {
   const { lessonId } = useParams();
   return <LearningPath key={lessonId || "path"} onLogout={onLogout} />;
 }
+
+
 
 function App() {
   return <BrowserRouter><AppRoutes /></BrowserRouter>;

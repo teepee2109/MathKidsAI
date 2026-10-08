@@ -300,32 +300,6 @@ function hashRegistrationOtp(email, code, purpose = "register") {
     .digest("hex");
 }
 
-async function hasActivePremium(pool, userId) {
-  try {
-    const result = await pool.request()
-      .input("userId", sql.Int, userId)
-      .query(`
-        SELECT TOP 1 SubscriptionId
-        FROM [mk].[PremiumSubscription]
-        WHERE UserId = @userId
-          AND Status = 'Active'
-          AND ExpiresAt > SYSUTCDATETIME()
-      `);
-
-    return Boolean(result.recordset && result.recordset.length > 0);
-  } catch {
-    return false;
-  }
-}
-
-function premiumRequired(response, feature = "") {
-  return response.status(403).json({
-    code: "PREMIUM_REQUIRED",
-    message: "Tính năng này chỉ dành cho tài khoản Premium.",
-    feature,
-  });
-}
-}
 
 function signSePayFields(fields) {
   const signedFields = ["order_amount", "merchant", "currency", "operation", "order_description", "order_invoice_number", "customer_id", "payment_method", "success_url", "error_url", "cancel_url"];
@@ -3128,6 +3102,219 @@ app.get("/api/parents/me/children/:studentId/recommendations", authenticate, req
     return response.status(500).json({ message: "Không thể tải gợi ý hỗ trợ.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
   }
 });
+
+// ──────────────────────────────────────────────────────────
+// BUG REPORT — gửi feedback tới Google Apps Script → Google Docs
+// ──────────────────────────────────────────────────────────
+
+const bugReportRateLimit = new Map();
+
+function cleanBugReportValue(value, maxLength) {
+  return typeof value === "string"
+    ? value.trim().slice(0, maxLength)
+    : "";
+}
+
+app.post("/api/bug-reports", async (request, response) => {
+  const webhookUrl =
+    process.env.BUG_REPORT_WEBHOOK_URL?.trim();
+
+  const webhookSecret =
+    process.env.BUG_REPORT_WEBHOOK_SECRET?.trim();
+
+  if (!webhookUrl) {
+    return response.status(503).json({
+      message:
+        "Bug report chưa được cấu hình. Hãy thêm BUG_REPORT_WEBHOOK_URL vào backend/.env.",
+    });
+  }
+
+  const ip =
+    request.ip ||
+    request.socket.remoteAddress ||
+    "unknown";
+
+  const now = Date.now();
+
+  const previous =
+    bugReportRateLimit.get(ip) || [];
+
+  const recent = previous.filter(
+    (timestamp) =>
+      now - timestamp < 60_000
+  );
+
+  if (recent.length >= 5) {
+    return response.status(429).json({
+      message:
+        "Bạn đã gửi quá nhiều bug report. Vui lòng thử lại sau một phút.",
+    });
+  }
+
+  recent.push(now);
+
+  bugReportRateLimit.set(
+    ip,
+    recent
+  );
+
+  const body = request.body || {};
+
+  const description =
+    cleanBugReportValue(
+      body.description,
+      4000
+    );
+
+  if (!description) {
+    return response.status(400).json({
+      message:
+        "Mô tả lỗi không được để trống.",
+    });
+  }
+
+  const allowedPriorities =
+    new Set([
+      "Low",
+      "Medium",
+      "High",
+      "Critical",
+    ]);
+
+  const allowedCategories =
+    new Set([
+      "Functional",
+      "UI / UX",
+      "Performance",
+      "Authentication",
+      "Payment",
+      "Data",
+      "Other",
+    ]);
+
+  const report = {
+    screen:
+      cleanBugReportValue(
+        body.screen,
+        160
+      ) || "Unknown",
+
+    priority:
+      allowedPriorities.has(
+        body.priority
+      )
+        ? body.priority
+        : "Medium",
+
+    category:
+      allowedCategories.has(
+        body.category
+      )
+        ? body.category
+        : "Other",
+
+    description,
+
+    steps:
+      cleanBugReportValue(
+        body.steps,
+        4000
+      ),
+
+    expected:
+      cleanBugReportValue(
+        body.expected,
+        2500
+      ),
+
+    actual:
+      cleanBugReportValue(
+        body.actual,
+        2500
+      ),
+
+    contact:
+      cleanBugReportValue(
+        body.contact,
+        255
+      ),
+
+    url:
+      cleanBugReportValue(
+        body.url,
+        1000
+      ),
+
+    browser:
+      cleanBugReportValue(
+        body.browser,
+        1000
+      ),
+
+    userRole:
+      cleanBugReportValue(
+        body.userRole,
+        40
+      ) || "Guest",
+
+    submittedAt:
+      new Date().toISOString(),
+  };
+
+  try {
+    const webhookResponse =
+      await fetch(webhookUrl, {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          secret: webhookSecret,
+          report,
+        }),
+
+        signal:
+          AbortSignal.timeout(12_000),
+      });
+
+    const payload =
+      await webhookResponse
+        .json()
+        .catch(() => ({}));
+
+    if (
+      !webhookResponse.ok ||
+      payload.ok === false
+    ) {
+      throw new Error(
+        payload.message ||
+        `Google Apps Script returned HTTP ${webhookResponse.status}`
+      );
+    }
+
+    return response.status(201).json({
+      message:
+        "Bug report đã được gửi thành công.",
+    });
+
+  } catch (error) {
+    return response.status(502).json({
+      message:
+        "Không thể gửi bug report tới Google Docs.",
+
+      ...(process.env.NODE_ENV !== "production"
+        ? {
+            detail:
+              error.message,
+          }
+        : {}),
+    });
+  }
+});
+
 app.use((_request, response) => response.status(404).json({ message: "Không tìm thấy API." }));
 app.listen(port, () => {
   console.log(`MathKids API đang chạy tại http://localhost:${port}`);
