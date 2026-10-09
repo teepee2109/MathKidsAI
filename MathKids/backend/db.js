@@ -22,7 +22,8 @@ const config = {
         // The SQL Server endpoint is exposed through a local TCP port that
         // resets simultaneous login sockets. Serialize requests on one pooled
         // connection instead of opening several sockets for page-load bursts.
-        max: 1,
+        // A server with a direct SQL Server connection can raise DB_POOL_MAX.
+        max: Number(process.env.DB_POOL_MAX) || 1,
         min: 0,
         idleTimeoutMillis: 30000,
     },

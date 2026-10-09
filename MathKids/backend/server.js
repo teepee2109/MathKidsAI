@@ -11,6 +11,8 @@ import { sendPasswordResetOtpEmail, sendRegistrationOtpEmail } from "./emailServ
 import bcrypt from "bcrypt";
 
 const app = express();
+// Nginx on the same host forwards the visitor IP (restored from Cloudflare).
+app.set("trust proxy", "loopback");
 const port = Number(process.env.PORT || 4000);
 const uploadsDirectory = fileURLToPath(new URL("./uploads/", import.meta.url));
 const questionBankMigrationPath = fileURLToPath(new URL("./migrations/QuestionBank.sql", import.meta.url));

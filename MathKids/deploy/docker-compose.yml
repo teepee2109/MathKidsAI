@@ -1,0 +1,30 @@
+# SQL Server for MathKids. Only reachable from the VPS itself (127.0.0.1).
+# Usage: cd MathKids/deploy && cp .env.example .env && docker compose up -d
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mathkids-mssql
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      # Express is free for production (10 GB per database). Developer edition is not licensed for production.
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in deploy/.env}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      # Bind to loopback: Docker bypasses ufw, so never publish 1433 publicly.
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ../../MathKidsDB.sql:/sql/MathKidsDB.sql:ro
+      - ../MathKidsPremiumPayment.sql:/sql/MathKidsPremiumPayment.sql:ro
+      - ./backups:/var/opt/mssql/backups
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  mssql-data:

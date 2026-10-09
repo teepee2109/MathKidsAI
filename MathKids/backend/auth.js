@@ -3,6 +3,10 @@ import jwt from "jsonwebtoken";
 import { randomUUID } from "node:crypto";
 import { getPool, sql } from "./db.js";
 
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET must be set in production.");
+}
+
 const jwtSecret =
     process.env.JWT_SECRET ||
     "mathkids-development-secret-change-me";
