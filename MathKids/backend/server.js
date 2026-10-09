@@ -340,7 +340,7 @@ async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactio
     .query("SELECT TOP 1 * FROM [mk].[PaymentOrder] WHERE InvoiceNumber = @invoice");
   const order = orderResult.recordset[0];
   if (!order) return false;
-  if (order.Status === "Paid") return true;
+  if (!["Pending", "Cancelled", "Paid"].includes(order.Status)) return false;
 
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
@@ -350,9 +350,9 @@ async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactio
       .input("sepayOrderId", sql.NVarChar(150), sepayOrderId)
       .input("transactionId", sql.NVarChar(150), transactionId)
       .query("UPDATE [mk].[PaymentOrder] SET Status = 'Paid', SePayOrderId = @sepayOrderId, SePayTransactionId = @transactionId, PaidAt = SYSUTCDATETIME() WHERE InvoiceNumber = @invoice AND Status IN ('Pending', 'Cancelled')");
-    if (!updateResult.rowsAffected[0]) {
+    if (!updateResult.rowsAffected[0] && order.Status !== "Paid") {
       await transaction.commit();
-      return true;
+      return false;
     }
     await transaction.request()
       .input("userId", sql.Int, order.UserId)
@@ -365,6 +365,20 @@ async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactio
     await transaction.rollback().catch(() => {});
     throw error;
   }
+}
+
+async function repairPaidPremiumSubscription(pool, userId) {
+  const result = await pool.request().input("userId", sql.Int, userId).query(`
+    SELECT TOP 1 po.InvoiceNumber
+    FROM [mk].[PaymentOrder] po
+    WHERE po.UserId = @userId
+      AND po.Status = 'Paid'
+      AND NOT EXISTS (SELECT 1 FROM [mk].[PremiumSubscription] ps WHERE ps.PaymentOrderId = po.PaymentOrderId)
+    ORDER BY COALESCE(po.PaidAt, po.CreatedAt) DESC
+  `);
+  const invoiceNumber = result.recordset[0]?.InvoiceNumber;
+  if (!invoiceNumber) return false;
+  return activatePremiumOrder(invoiceNumber);
 }
 
 async function reconcileSePayOrder(invoiceNumber, sepayOrderId) {
@@ -1127,6 +1141,10 @@ app.post("/api/payments/premium/create", authenticate, async (request, response)
   };
   try {
     const pool = await getPool();
+    await repairPaidPremiumSubscription(pool, request.user.userId);
+    if (await hasActivePremium(pool, request.user.userId)) {
+      return response.status(409).json({ code: "PREMIUM_ALREADY_ACTIVE", message: "Tài khoản của bạn đã có Premium đang hoạt động." });
+    }
     await pool.request().input("userId", sql.Int, request.user.userId).input("invoice", sql.NVarChar(100), invoiceNumber)
       .input("amount", sql.Decimal(12, 2), premiumPrice).input("currency", sql.VarChar(3), "VND")
       .query("INSERT INTO [mk].[PaymentOrder] (UserId, InvoiceNumber, Amount, Currency, Status) VALUES (@userId, @invoice, @amount, @currency, 'Pending')");
@@ -1171,6 +1189,7 @@ app.get("/api/payments/premium/status", authenticate, async (request, response) 
   try {
     const pool = await getPool();
     const userId = request.user.userId;
+    await repairPaidPremiumSubscription(pool, userId);
     let result = await pool.request().input("userId", sql.Int, userId).query(`
       SELECT TOP 1 PlanCode AS planCode, StartsAt AS startsAt, ExpiresAt AS expiresAt
       FROM [mk].[PremiumSubscription]

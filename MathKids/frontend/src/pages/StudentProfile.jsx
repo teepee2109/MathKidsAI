@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "../api";
 import BrandLogo from "../components/BrandLogo";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import { getMyInviteCode } from "../services/parentService";
-import { apiFetch } from "../api";
 import "./StudentProfile.css";
 import "./StudentProfileAvatar.css";
 import "./StudentProfilePremium.css";
@@ -101,7 +101,7 @@ export default function StudentProfile() {
       let lastError;
       for (let attempt = 0; attempt < 3 && !controller.signal.aborted; attempt += 1) {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/payments/premium/status`, {
+          const response = await apiFetch("payments/premium/status", {
             cache: "no-store",
             headers: { Authorization: `Bearer ${getAuthToken()}` },
             signal: controller.signal,

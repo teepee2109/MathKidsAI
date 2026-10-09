@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { apiUrl } from "../api";
 import { getAuthToken, getCachedUser, saveCachedUser } from "../authStorage";
 import "./PaymentResult.css";
 
@@ -18,7 +19,7 @@ export default function PaymentResult() {
     const load = async () => {
       const endpoint = status === "cancel" ? "cancel" : "status";
       const reconcile = status === "success" && attempts === 0 ? "?reconcile=1" : "";
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/payments/${encodeURIComponent(invoice)}/${endpoint}${reconcile}`, {
+      const response = await fetch(apiUrl(`payments/${encodeURIComponent(invoice)}/${endpoint}${reconcile}`), {
         method: status === "cancel" ? "POST" : "GET",
         cache: "no-store",
         headers: { Authorization: `Bearer ${getAuthToken()}` },
@@ -48,5 +49,5 @@ export default function PaymentResult() {
 
   const paid = status === "success" && payment?.status === "Paid";
   const cancelled = status === "cancel";
-  return <main className="payment-result-page"><section className={`payment-result-card ${paid ? "payment-good" : cancelled ? "payment-cancelled" : ""}`}><span className="payment-result-icon">{paid ? "🎉" : cancelled ? "↩️" : status === "error" ? "💛" : "⏳"}</span><h1>{paid ? "Nâng cấp thành công!" : cancelled ? "Bạn đã hủy thanh toán" : status === "error" ? "Thanh toán chưa hoàn tất" : loading ? "Đang xác nhận thanh toán…" : "Đang chờ SePay xác nhận"}</h1><p>{paid ? `Tài khoản Premium đã được mở trong 30 ngày. Bạn có thể quay lại xem lộ trình học cá nhân hóa.` : cancelled ? "Bạn có thể quay lại trang Premium để thử lại bất cứ lúc nào." : status === "error" ? "Giao dịch chưa được ghi nhận. Vui lòng kiểm tra lại hoặc thử lại." : "SePay đang gửi kết quả về MathKids. Nếu bạn vừa thanh toán, hãy đợi vài giây rồi tải lại trang."}</p>{payment?.expiresAt && <small>Hiệu lực đến: {new Date(payment.expiresAt).toLocaleDateString("vi-VN")}</small>}<div className="payment-result-actions"><Link to="/dashboard">Về dashboard</Link><Link to="/premium">Xem gói Premium</Link></div></section></main>;
+  return <main className="payment-result-page"><section className={`payment-result-card ${paid ? "payment-good" : cancelled ? "payment-cancelled" : ""}`}><span className="payment-result-icon">{paid ? "🎉" : cancelled ? "↩️" : status === "error" ? "💛" : "⏳"}</span><h1>{paid ? "Nâng cấp thành công!" : cancelled ? "Bạn đã hủy thanh toán" : status === "error" ? "Thanh toán chưa hoàn tất" : loading ? "Đang xác nhận thanh toán…" : "Đang chờ SePay xác nhận"}</h1><p>{paid ? `Tài khoản Premium đã được mở trong 30 ngày. Bạn có thể quay lại xem lộ trình học cá nhân hóa.` : cancelled ? "Bạn có thể quay lại trang Premium để thử lại bất cứ lúc nào." : status === "error" ? "Giao dịch chưa được ghi nhận. Vui lòng kiểm tra lại hoặc thử lại." : "SePay đang gửi kết quả về MathKids. Nếu bạn vừa thanh toán, hãy đợi vài giây rồi tải lại trang."}</p>{payment?.expiresAt && <small>Hiệu lực đến: {new Date(payment.expiresAt).toLocaleDateString("vi-VN")}</small>}<div className="payment-result-actions"><Link to={paid ? "/hoc-tap" : "/dashboard"}>{paid ? "Xem lộ trình học" : "Về dashboard"}</Link>{!paid && <Link to="/premium">Thử lại Premium</Link>}</div></section></main>;
 }
