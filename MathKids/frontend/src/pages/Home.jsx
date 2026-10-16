@@ -1,24 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import StudyArt, { StudyIcon } from "../components/StudyArt";
 import "./Home.css";
 
 const navItems = [["⌂", "Trang chủ", "#top"], ["▣", "Học tập", "#features"], ["⌁", "Trò chơi", "#games"], ["♜", "Thử thách", "#challenge"], ["▣", "Phần thưởng", "#rewards"]];
 const featureCards = [
-  { number: "1", icon: "🤖", title: "Học tập\ncá nhân hóa", text: "AI sẽ phân tích khả năng của con và tạo lộ trình học phù hợp nhất.", tone: "blue" },
-  { number: "2", icon: "🎮", title: "Trò chơi toán học", text: "Học toán qua các trò chơi vui nhộn, hấp dẫn và đầy thử thách.", tone: "green" },
-  { number: "3", icon: "📅", title: "Thử thách hàng ngày", text: "Hoàn thành thử thách mỗi ngày để rèn luyện kỹ năng và nhận phần thưởng.", tone: "yellow" },
-  { number: "4", icon: "🪙", title: "Phần thưởng", text: "Tích lũy điểm thưởng, mở khóa huy hiệu và nhận quà hấp dẫn.", tone: "purple" },
-  { number: "5", icon: "📊", title: "Báo cáo tiến độ\ncho phụ huynh", text: "Theo dõi kết quả học tập, biết được điểm mạnh và cần cải thiện của con.", tone: "teal" },
+  { number: "1", icon: "book", title: "Bài học của em", text: "Xem hình, hiểu bài và cùng làm thử.", tone: "blue", href: "/hoc-tap" },
+  { number: "2", icon: "game", title: "Trò chơi Toán", text: "Vui cùng những con số và hình học.", tone: "green", href: "/tro-choi" },
+  { number: "3", icon: "flag", title: "Thử thách nhỏ", text: "Mỗi ngày thử sức với một câu hỏi mới.", tone: "yellow", href: "/dashboard#challenge" },
+  { number: "4", icon: "gift", title: "Quà của em", text: "Ghi lại nỗ lực qua những ngôi sao và huy hiệu.", tone: "purple", href: "/phan-thuong" },
+  { number: "5", icon: "leaf", title: "Cùng con học tập", text: "Góc riêng để phụ huynh theo dõi tiến bộ của con.", tone: "teal", href: "/parent/dashboard" },
 ];
 
 function HeroArt() {
-  return <div className="hero-art" aria-label="Hai bạn nhỏ đang học toán">
-    <span className="math-float plus one">＋</span><span className="math-float plus two">＋</span><span className="math-float times">×</span><span className="math-float equal">＝</span>
-    <div className="kid kid-boy"><div className="hair">◜◝</div><div className="face">◕‿◕</div><div className="shirt">◡</div></div>
-    <div className="kid kid-girl"><div className="hair">◜◝</div><div className="face">◕‿◕</div><div className="shirt">◡</div></div>
-    <div className="book"><span>1</span><span>2</span><span>3</span><b>＋ −</b></div><div className="star-mascot">★<small>⌒</small></div>
-  </div>;
+  return <div className="home-story-art"><StudyArt grade={1} /></div>;
 }
 
 function NotificationBell({ isAuthenticated }) {
@@ -43,7 +39,7 @@ function Home({ isAuthenticated = false, onLogout }) {
       <div className="hero-copy"><div className="hero-kicker">✦ Ứng dụng học toán dành cho trẻ em</div><h1>Toán học thật vui!</h1><h2><span>Học</span> – <em>Chơi</em> – <strong>Phát triển!</strong></h2><p>Cùng MathKids khám phá thế giới toán học<br className="desktop" /> qua những trò chơi thú vị, được cá nhân hóa<br className="desktop" /> phù hợp với khả năng của con!</p><a href="#features" className="start-btn"><span>▶</span> Bắt đầu học</a></div>
       <HeroArt /><span className="cloud cloud-left">☁</span><span className="cloud cloud-right">☁</span>
     </section>
-    <section className="features" id="features"><div className="feature-grid">{featureCards.map(card => <article className={`feature-card ${card.tone}`} key={card.number}><span className="card-number">{card.number}</span><div className="feature-icon">{card.icon}</div><h3>{card.title.split("\n").map((t, i) => <span key={t}>{i > 0 && <br />}{t}</span>)}</h3><p>{card.text}</p><a href="#top" aria-label={card.title}>→</a></article>)}</div></section>
+    <section className="features" id="features"><div className="feature-grid">{featureCards.map(card => <article className={`feature-card ${card.tone}`} key={card.number}><div className="feature-icon"><StudyIcon name={card.icon} size={34} /></div><h3>{card.title}</h3><p>{card.text}</p><Link to={card.href} aria-label={`Mở ${card.title}`}><StudyIcon name="arrow" /></Link></article>)}</div></section>
     <section className="progress-message" id="games"><div className="sprout">✦</div><h2>Mỗi ngày một chút tiến bộ!</h2><p>MathKids – Đồng hành cùng con trên hành trình chinh phục toán học!</p><div className="stacked-books">▰<br />▰<br />▰</div></section>
     <section className="hidden-anchor" id="challenge" /><section className="hidden-anchor" id="rewards" />
   </main>;

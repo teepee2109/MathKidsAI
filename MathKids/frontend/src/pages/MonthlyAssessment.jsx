@@ -104,8 +104,8 @@ export default function MonthlyAssessment({ onLogout }) {
     }
   }
 
-  return <main className="monthly-page">
-    <header className="monthly-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về dashboard</Link></header>
+  return <main className="monthly-page" data-grade={current?.grade || data?.grade || 1}>
+    <header className="monthly-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về góc học</Link></header>
     <div className="monthly-content">
       <section className="monthly-heading-card">
         <div><span className="monthly-kicker">KIỂM TRA ĐỊNH KỲ · LỚP {current?.grade || data?.grade || "—"}</span>

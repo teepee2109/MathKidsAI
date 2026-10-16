@@ -59,7 +59,7 @@ export default function StudentRewards() {
 
   const xp = Number(rewards?.totalXp || 0);
   return <main className="student-rewards-page">
-    <header className="rewards-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về dashboard</Link></header>
+    <header className="rewards-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về góc học</Link></header>
     <div className="rewards-content">
       <section className="rewards-hero">
         <span className="rewards-hero-icon">🎁</span><span className="rewards-kicker">NỖ LỰC ĐƯỢC GHI NHẬN</span>

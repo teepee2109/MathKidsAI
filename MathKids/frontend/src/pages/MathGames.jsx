@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import StudyArt from "../components/StudyArt";
 import { getCachedUser } from "../authStorage";
 import { claimGameRewards, getQuestionTopics, getQuestions, submitQuestionAnswer } from "../services/questions";
 import ArcadeMathGames from "./ArcadeMathGames";
@@ -26,7 +27,7 @@ const currentTime = () => Date.now();
 const elapsedSeconds = (startedAt) => Math.max(0, Math.floor((currentTime() - startedAt) / 1000));
 
 function GameHeader() {
-  return <header className="math-game-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="game-back-link">← Về dashboard</Link></header>;
+  return <header className="math-game-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="game-back-link">← Về góc học</Link></header>;
 }
 
 function GamePicker() {
@@ -46,7 +47,7 @@ function GamePicker() {
     { mode: "word", icon: "🔎", color: "game-orange", tag: "TOÁN ĐỐ", title: "Giải mã bài toán", type: "Đọc hiểu · Lập phép tính", description: "Đọc tình huống, chọn phép tính phù hợp rồi nhập lời giải." },
     { mode: "geometry", icon: "📐", color: "game-blue", tag: "TOÁN HÌNH", title: "Xây hình đúng yêu cầu", type: "Tạo hình · Diện tích · Chu vi", description: "Điều chỉnh hình chữ nhật để đạt diện tích hoặc chu vi mục tiêu." },
   ];
-  return <main className={`math-games-page game-theme-${theme}`}><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn thế giới để bắt đầu!</h1><p>Học toán qua nhiệm vụ, khám phá và trò chơi tương tác — không chỉ làm quiz.</p></div><div className="game-theme-picker" aria-label="Chọn chủ đề giao diện">{Object.entries(gameThemes).map(([key, item]) => <button key={key} className={theme === key ? "is-active" : ""} onClick={() => chooseTheme(key)}>{item.icon} {item.name}</button>)}</div><section className="game-theme-hero"><div className="game-theme-hero-copy"><span className="game-theme-kicker">{activeTheme.icon} CHỦ ĐỀ ĐANG CHỌN · LỚP {grade}</span><h2>{activeTheme.title}</h2><p>{activeTheme.description}</p><span className="game-theme-fit">Phù hợp: {activeTheme.fit}</span><a href="#interactive-games" className="game-theme-action">{activeTheme.action} <span>→</span></a></div><div className="game-theme-character" aria-hidden="true">{activeTheme.character}</div><div className="game-theme-decoration" aria-hidden="true">{theme === "space" ? "✦  ·  🪐  ·  ✧" : theme === "ocean" ? "🫧  🐠  🫧" : "🍃  🌼  🍃"}</div></section><h2 className="game-section-title" id="interactive-games">🎮 Trò chơi tương tác</h2><div className="grade-game-grid arcade-picker-grid">{arcadeGames.map((game) => <Link key={game.mode} to={`/tro-choi?mini=${game.mode}&grade=${grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">{game.tag}</span><h2>{game.title}</h2><strong>{game.type}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div><h2 className="game-section-title">📚 Thử thách theo lớp</h2><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
+  return <main className={`math-games-page game-theme-${theme}`} data-grade={grade}><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn thế giới để bắt đầu!</h1><p>Chọn một trò chơi, cùng vui với những con số nhé.</p></div><div className="game-theme-picker" aria-label="Chọn chủ đề giao diện">{Object.entries(gameThemes).map(([key, item]) => <button key={key} className={theme === key ? "is-active" : ""} onClick={() => chooseTheme(key)}>{item.icon} {item.name}</button>)}</div><section className="game-theme-hero"><div className="game-theme-hero-copy"><span className="game-theme-kicker">{activeTheme.icon} CHỦ ĐỀ ĐANG CHỌN · LỚP {grade}</span><h2>{activeTheme.title}</h2><p>{activeTheme.description}</p><span className="game-theme-fit">Phù hợp: {activeTheme.fit}</span><a href="#interactive-games" className="game-theme-action">{activeTheme.action} <span>→</span></a></div><div className="game-theme-character"><StudyArt grade={grade} /></div><div className="game-theme-decoration" aria-hidden="true">{theme === "space" ? "✦  ·  🪐  ·  ✧" : theme === "ocean" ? "🫧  🐠  🫧" : "🍃  🌼  🍃"}</div></section><h2 className="game-section-title" id="interactive-games">🎮 Trò chơi tương tác</h2><div className="grade-game-grid arcade-picker-grid">{arcadeGames.map((game) => <Link key={game.mode} to={`/tro-choi?mini=${game.mode}&grade=${grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">{game.tag}</span><h2>{game.title}</h2><strong>{game.type}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div><h2 className="game-section-title">📚 Thử thách theo lớp</h2><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
 }
 
 function PlayGame({ game }) {
@@ -159,7 +160,7 @@ function PlayGame({ game }) {
   }
 
   const question = questions[round - 1];
-  return <main className="math-games-page"><GameHeader /><section className="play-area">
+  return <main className="math-games-page" data-grade={game.grade}><GameHeader /><section className="play-area">
     <Link className="play-back" to="/tro-choi">← Chọn trò chơi khác</Link>
     <div className={`play-card ${game.color}`}>
       <div className="play-card-top"><span className="grade-chip">LỚP {game.grade}</span><span className="question-count">{finished ? "HOÀN THÀNH" : questions.length ? `CÂU ${round} / ${questions.length}` : "QUESTION BANK"}</span></div>

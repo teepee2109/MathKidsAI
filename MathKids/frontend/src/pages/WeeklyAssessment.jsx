@@ -86,8 +86,8 @@ export default function WeeklyAssessment({ onLogout }) {
     } finally { setBusy(false); }
   }
 
-  return <main className="weekly-page">
-    <header className="weekly-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về dashboard</Link></header>
+  return <main className="weekly-page" data-grade={current?.grade || data?.grade || 1}>
+    <header className="weekly-header"><BrandLogo to="/dashboard" /><Link to="/dashboard">← Về góc học</Link></header>
     <div className="weekly-content">
       <section className="weekly-heading"><span className="weekly-kicker">ĐÁNH GIÁ NĂNG LỰC · LỚP {data?.grade || "—"}</span><h1>Thử thách kiến thức tuần</h1><p>Kết quả giúp điều chỉnh độ khó bài luyện tập tuần sau cho phù hợp với con.</p>
         {data && <div className="weekly-level-chip">Độ khó hiện tại: <strong>{levelNames[data.recommendedDifficulty]}</strong></div>}

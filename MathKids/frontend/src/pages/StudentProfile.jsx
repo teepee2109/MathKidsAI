@@ -252,7 +252,7 @@ export default function StudentProfile() {
   }
 
   return <main className="profile-page">
-    <header className="profile-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="back-dashboard">← Quay lại dashboard</Link></header>
+    <header className="profile-header"><BrandLogo to="/dashboard" /><Link to="/dashboard" className="back-dashboard">← Về góc học</Link></header>
     <section className="profile-card">
       <div className="profile-heading"><span className="profile-heading-icon">👤</span><div><small>THÔNG TIN TÀI KHOẢN</small><h1>Hồ sơ học sinh</h1><p>Cập nhật thông tin để cá nhân hóa hành trình học tập.</p></div></div>
       <section className={`profile-premium-status ${premiumStatus.isPremium ? "is-active" : "is-free"}`} aria-label="Trạng thái tài khoản">

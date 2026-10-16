@@ -252,7 +252,7 @@ function GameTitle({ icon, label, title, description }) { return <div className=
 function ArcadeDone({ icon, title, reward, onRestart }) { return <div className="arcade-finish"><span>{icon}</span><h2>{title}</h2><p className="arcade-xp">{reward ? reward.message : "Đang ghi nhận XP…"}</p><button onClick={onRestart}>Chơi lại</button></div>; }
 
 function ArcadeHeader() {
-  return <header className="arcade-header"><Link to="/tro-choi">← Các trò chơi</Link><Link to="/dashboard">Về dashboard</Link></header>;
+  return <header className="arcade-header"><Link to="/tro-choi">← Các trò chơi</Link><Link to="/dashboard">Về góc học</Link></header>;
 }
 
 function MemoryGame({ grade }) {
@@ -526,7 +526,7 @@ export default function ArcadeMathGames({ mode: initialMode, grade: initialGrade
     setGrade(value);
     setSearchParams({ mini: mode, grade: String(value) });
   }
-  return <main className="math-games-page"><ArcadeHeader /><div className="arcade-page">
+  return <main className="math-games-page" data-grade={grade}><ArcadeHeader /><div className="arcade-page">
     <div className="arcade-toolbar"><label>Lớp của em<select value={grade} onChange={(event) => changeGrade(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((item) => <option key={item} value={item}>Lớp {item}</option>)}</select></label><Link to="/tro-choi">← Chọn trò khác</Link></div>
     {mode === "garden" ? <GardenGame key={`garden-${grade}`} grade={grade} /> : mode === "balance" ? <BalanceGame key={`balance-${grade}`} grade={grade} /> : mode === "maze" ? <MazeGame key={`maze-${grade}`} grade={grade} /> : mode === "formula" ? <FormulaGame key={`formula-${grade}`} grade={grade} /> : mode === "word" ? <WordProblemGame key={`word-${grade}`} grade={grade} /> : mode === "geometry" ? <GeometryGame key={`geometry-${grade}`} grade={grade} /> : <MemoryGame key={`memory-${grade}`} grade={grade} />}
   </div></main>;

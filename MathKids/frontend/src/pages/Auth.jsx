@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAuthSession } from "../authStorage";
 import BrandLogo from "../components/BrandLogo";
+import StudyArt from "../components/StudyArt";
 import "./Auth.css";
 
 const initialValues = {
@@ -366,16 +367,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
                 <div className="visual-content">
 
-                    <div
-                        className="brand-mark"
-                        aria-hidden="true"
-                    >
-                        <span className="brand-logo-icon"><img src="/mathkids-logo.png" alt="" /></span>
-                    </div>
-
-                    <p className="eyebrow">
-                        MathKids
-                    </p>
+                    <BrandLogo className="brand auth-story-brand" to="/" />
 
                     <h1>
                         Học Toán vui hơn,
@@ -419,7 +411,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     className="visual-character"
                     aria-hidden="true"
                 >
-                    🦊
+                    <StudyArt grade={1} />
                 </div>
             </section>
 

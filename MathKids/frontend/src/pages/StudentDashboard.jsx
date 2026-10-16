@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import StudyArt, { StudyIcon } from "../components/StudyArt";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import { apiFetch, apiUrl } from "../api";
 import { getLearningPath } from "../services/learning";
@@ -58,7 +59,7 @@ export default function StudentDashboard({ onLogout }) {
   const equippedFrame = equippedRewards.find((code) => ["rainbow-frame", "sunset-frame", "starlight-frame"].includes(code)) || "";
   const equippedCompanion = equippedRewards.find((code) => ["fox-companion", "owl-companion", "dino-companion"].includes(code)) || "";
   const equippedTheme = equippedRewards.find((code) => ["space-theme", "ocean-theme", "forest-theme"].includes(code)) || "";
-  const companionIcon = { "fox-companion": "🦊", "owl-companion": "🦉", "dino-companion": "🦖" }[equippedCompanion] || "🤖";
+  const companionIcon = { "fox-companion": "🦊", "owl-companion": "🦉", "dino-companion": "🦖" }[equippedCompanion];
   const rewardLabels = {
     "rainbow-frame": "🌈 Khung cầu vồng đang trang trí ảnh đại diện",
     "sunset-frame": "🌅 Khung hoàng hôn đang trang trí ảnh đại diện",
@@ -315,18 +316,20 @@ export default function StudentDashboard({ onLogout }) {
     loadDashboard();
   }
 
-  return <main className={`student-dashboard ${equippedTheme ? `reward-theme-${equippedTheme.replace("-theme", "")}` : ""}`}>
+  return <main data-grade={grade} className={`student-dashboard ${equippedTheme ? `reward-theme-${equippedTheme.replace("-theme", "")}` : ""}`}>
     <header className="dashboard-header">
       <BrandLogo className="dashboard-brand" to="/dashboard" />
-      <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard">⌂ <span>Tổng quan</span></a><Link to="/hoc-tap">▣ <span>Học tập</span></Link><Link to="/tro-choi">🎮 <span>Trò chơi</span></Link><a href="#challenge">♜ <span>Thử thách</span></a><Link to="/lien-he">🎧 <span>Hỗ trợ</span></Link></nav>
-      <div className="dashboard-account"><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedFrame ? `reward-frame-${equippedFrame.replace("-frame", "")}` : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : "👦"}</span><span className="account-name">{student?.name || "Học sinh"}</span></Link><button onClick={onLogout}>Đăng xuất</button></div>
+      <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard"><StudyIcon name="home" /><span>Góc học</span></a><Link to="/hoc-tap"><StudyIcon name="book" /><span>Bài học</span></Link><Link to="/tro-choi"><StudyIcon name="game" /><span>Trò chơi</span></Link><a href="#challenge"><StudyIcon name="flag" /><span>Thử thách</span></a><Link to="/lien-he"><StudyIcon name="help" /><span>Hỗ trợ</span></Link></nav>
+      <div className="dashboard-account"><Link className="sky-star-wallet" to="/phan-thuong"><StudyIcon name="star" /><span>{loading ? "…" : (student?.totalStars ?? 0)} sao của em</span></Link><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedFrame ? `reward-frame-${equippedFrame.replace("-frame", "")}` : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#ffe25a" stroke="#eba528" strokeWidth="3" /><circle cx="17" cy="20" r="2" fill="#b8751e" /><circle cx="31" cy="20" r="2" fill="#b8751e" /><path d="M16 28q8 10 16 0" fill="none" stroke="#b8751e" strokeWidth="3" strokeLinecap="round" /></svg>}</span><span className="account-name">{student?.name || "Học sinh"}<span className="sky-profile-grade"> · Lớp {grade}</span></span></Link><button onClick={onLogout}>Đăng xuất</button></div>
     </header>
 
     <div className="dashboard-content" id="dashboard">
-      <section className="welcome-banner">
-        <div className="welcome-copy"><span className="welcome-tag">✦ KHU VỰC HỌC TẬP CỦA BẠN</span><h1>Chào {student?.name?.split(" ").at(-1) || "bạn nhỏ"}! 👋</h1><p>Sẵn sàng khám phá thêm điều mới hôm nay chưa?</p><div className="welcome-learning-tip"><span>🌟</span><span>Mỗi ngày học một chút, tiến bộ thật nhiều!</span></div>{equippedRewards.length > 0 && <div className="equipped-reward-labels" role="status">{equippedRewards.map((code) => <span className="equipped-reward-label" key={code}>{rewardLabels[code]}</span>)}</div>}<Link to="/hoc-tap" className="welcome-cta">Tiếp tục học <span>→</span></Link></div>
-        <div className="welcome-art" aria-hidden="true"><span className="welcome-sun">☀</span><span className="welcome-mascot">{companionIcon}</span><span className="welcome-book">1&nbsp; 2&nbsp; 3</span></div>
+      <section className="welcome-banner" aria-labelledby="today-lesson-title">
+        <div className="welcome-copy"><span className="welcome-tag"><StudyIcon name="leaf" /> Bài của em hôm nay</span><h1 id="today-lesson-title">{learningCards.find((card) => !card.isLocked && !card.isCompleted)?.title || "Mở sách, khám phá Toán!"}</h1><p>{grade <= 2 ? "Cùng Thỏ Nâu khám phá!" : "Mỗi bài học, thêm một điều hay."}</p><Link to="/hoc-tap" className="welcome-cta">Học tiếp<StudyIcon name="arrow" /></Link>{companionIcon && <div className="study-companion"><span aria-hidden="true">{companionIcon}</span>Bạn đồng hành đang cổ vũ em!</div>}</div>
+        <StudyArt grade={grade} />
       </section>
+
+      <nav className="study-shortcuts" aria-label="Khám phá góc học"><Link to="/hoc-tap"><span className="study-shortcut-art"><StudyIcon name="book" size={36} /></span><span><strong>Bài học</strong><small>{grade <= 2 ? "Cùng xem và làm thử" : "Học theo lộ trình của em"}</small></span><StudyIcon name="arrow" /></Link><Link to="/tro-choi"><span className="study-shortcut-art"><StudyIcon name="game" size={36} /></span><span><strong>Trò chơi</strong><small>Vui cùng những con số</small></span><StudyIcon name="arrow" /></Link><Link to="/phan-thuong"><span className="study-shortcut-art"><StudyIcon name="gift" size={36} /></span><span><strong>{grade <= 2 ? "Quà của em" : "Thành tích & phần thưởng"}</strong><small>{loading ? "Đang tải số sao…" : `${student?.totalStars ?? 0} sao của em`}</small></span><StudyIcon name="arrow" /></Link></nav>
 
       {error && <div className="dashboard-error" role="alert"><span>{error}</span><button onClick={retryDashboard}>Thử lại</button></div>}
 
@@ -353,7 +356,7 @@ export default function StudentDashboard({ onLogout }) {
 
       <Link to="/phan-thuong" className="rewards-invite"><span className="rewards-invite-icon">🎁</span><span className="rewards-invite-copy"><strong>Phần thưởng của bạn</strong><small>{badgeMilestones.filter((badge) => totalXp >= badge.xp).length} huy hiệu · Cấp {currentLevel} · {levelProgress}/100 XP tới cấp tiếp theo</small><span className="rewards-badge-preview">{badgeMilestones.map((badge) => <i className={totalXp >= badge.xp ? "is-unlocked" : ""} key={badge.name} title={`${badge.name} · ${badge.xp} XP`}>{badge.icon}</i>)}</span></span><b>Đổi sao & xem huy hiệu →</b></Link>
 
-      <Link to="/danh-gia" className="assessment-invite supplementary-activity"><span>🧠</span><div><strong>{student?.completedAssessments ? "Xem bản đồ kỹ năng & lộ trình học" : "Đánh giá để hiểu con cần học gì"}</strong><small>Bài đánh giá ngắn để gợi ý bài học phù hợp, không phải bài thi và không ảnh hưởng điểm ở trường.</small></div><b> {student?.completedAssessments ? "Xem kết quả" : "Làm sau"} →</b></Link>
+      <Link to="/danh-gia" className="assessment-invite supplementary-activity"><span><StudyIcon name="flag" size={30} /></span><div><strong>{student?.completedAssessments ? "Những điều em đã làm được" : "Khám phá kiến thức của em"}</strong><small>10 câu hỏi nhỏ để chọn bài học phù hợp. Không ảnh hưởng điểm ở trường.</small></div><b>{student?.completedAssessments ? "Xem kết quả" : "Khám phá"} →</b></Link>
 
       <Link to={student?.isPremium ? "/danh-gia-tuan" : "/premium"} className="weekly-assessment-invite supplementary-activity"><span>{student?.isPremium ? "📈" : "🔒"}</span><div><strong>Điều chỉnh bài học theo tuần{!student?.isPremium && " · Premium"}</strong><small>{student?.isPremium ? "Một hoạt động ngắn giúp tuần sau có bài luyện vừa sức hơn." : "Mở tính năng cá nhân hóa độ khó bài học."}</small></div><b>{student?.isPremium ? "Làm sau" : "Tìm hiểu"}</b></Link>
 
@@ -394,7 +397,8 @@ export default function StudentDashboard({ onLogout }) {
         </aside>
       </div>
 
-      <footer className="dashboard-footer"><span>🌱</span><strong>Mỗi ngày một chút tiến bộ!</strong><span>MathKids luôn đồng hành cùng bạn. · <Link to="/lien-he" style={{ color: "inherit", fontWeight: 700 }}>Hỗ trợ khách hàng</Link></span></footer>
+      {equippedRewards.length > 0 && <div className="equipped-reward-labels study-equipped-summary" role="status">{equippedRewards.map((code) => <span className="equipped-reward-label" key={code}>{rewardLabels[code]}</span>)}</div>}
+      <footer className="dashboard-footer"><StudyIcon name="leaf" /><strong>Mỗi ngày một chút tiến bộ.</strong><Link to="/lien-he">Cần giúp đỡ?</Link></footer>
     </div>
   </main>;
 }
