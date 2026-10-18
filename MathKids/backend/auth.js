@@ -382,9 +382,63 @@ export async function loginWithGoogle(credential, requestedRole) {
         throw error;
     }
 
-    const email = googleUser.email.trim().toLowerCase();
+    return findOrCreateExternalUser({ email: googleUser.email, name: googleUser.name, requestedRole, providerLabel: "Google" });
+}
+
+let firebaseAuthPromise;
+
+function getFirebaseAdminAuth() {
+    if (!firebaseAuthPromise) {
+        // Verifying ID tokens only needs the project id (public keys are fetched from Google), no service account.
+        firebaseAuthPromise = Promise.all([import("firebase-admin/app"), import("firebase-admin/auth")])
+            .then(([{ getApps, initializeApp }, { getAuth }]) => getAuth(getApps()[0] || initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID.trim() })));
+    }
+    return firebaseAuthPromise;
+}
+
+export async function loginWithFirebase(idToken, requestedRole) {
+    if (!String(process.env.FIREBASE_PROJECT_ID || "").trim()) {
+        const error = new Error("Firebase Authentication chưa được cấu hình trên máy chủ (thiếu FIREBASE_PROJECT_ID).");
+        error.status = 503;
+        throw error;
+    }
+    if (typeof idToken !== "string" || idToken.length < 20) {
+        const error = new Error("Thông tin xác thực Firebase không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    if (requestedRole !== undefined && !["Student", "Parent"].includes(requestedRole)) {
+        const error = new Error("Vai trò đăng ký không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    let firebaseUser;
+    try {
+        firebaseUser = await (await getFirebaseAdminAuth()).verifyIdToken(idToken);
+    } catch {
+        const error = new Error("Không thể xác thực tài khoản Firebase.");
+        error.status = 401;
+        throw error;
+    }
+    if (!["google.com", "password"].includes(firebaseUser.firebase?.sign_in_provider) || !firebaseUser.email) {
+        const error = new Error("Phương thức đăng nhập Firebase này không được hỗ trợ.");
+        error.status = 401;
+        throw error;
+    }
+    // Accounts are matched by email, so an unverified email must never sign into an existing account.
+    if (firebaseUser.email_verified !== true) {
+        const error = new Error("Email chưa được xác minh. Hãy mở liên kết xác minh trong hộp thư rồi đăng nhập lại.");
+        error.status = 403;
+        throw error;
+    }
+    return findOrCreateExternalUser({ email: firebaseUser.email, name: firebaseUser.name, requestedRole, providerLabel: "Firebase" });
+}
+
+// Signs in (or creates) the AppUser that owns an email already verified by Google or Firebase.
+async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, providerLabel }) {
+    const email = rawEmail.trim().toLowerCase();
     if (requestedRole && !/@gmail\.com$/i.test(email)) {
-        const error = new Error("Email đăng ký bằng Google bắt buộc phải kết thúc bằng @gmail.com.");
+        const error = new Error(`Email đăng ký bằng ${providerLabel} bắt buộc phải kết thúc bằng @gmail.com.`);
         error.status = 400;
         throw error;
     }
@@ -404,7 +458,7 @@ export async function loginWithGoogle(credential, requestedRole) {
             const created = await transaction.request()
                 .input("email", sql.NVarChar(255), email)
                 .input("passwordHash", sql.NVarChar(500), await bcrypt.hash(randomUUID(), 12))
-                .input("displayName", sql.NVarChar(120), String(googleUser.name || email.split("@")[0]).slice(0, 120))
+                .input("displayName", sql.NVarChar(120), String(name || email.split("@")[0]).slice(0, 120))
                 .input("userRole", sql.VarChar(20), userRole)
                 .query("INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName, UserRole) OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole VALUES (@email, @passwordHash, @displayName, @userRole)");
             user = created.recordset[0];
@@ -421,7 +475,7 @@ export async function loginWithGoogle(credential, requestedRole) {
         }
     }
     if (requestedRole && user.UserRole !== requestedRole) {
-        const error = new Error("Email Google này đã có tài khoản với vai trò khác. Hãy đăng nhập bằng tài khoản hiện có; không thể đổi vai trò khi đăng ký lại.");
+        const error = new Error(`Email ${providerLabel} này đã có tài khoản với vai trò khác. Hãy đăng nhập bằng tài khoản hiện có; không thể đổi vai trò khi đăng ký lại.`);
         error.status = 409;
         throw error;
     }

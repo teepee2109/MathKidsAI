@@ -2,6 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAuthSession } from "../authStorage";
 import { trackEvent } from "../analytics";
+import {
+    getFirebaseAuthErrorMessage,
+    getVerifiedFirebaseIdToken,
+    isFirebaseAuthConfigured,
+    registerWithFirebaseEmail,
+    resendFirebaseVerificationEmail,
+    sendFirebasePasswordReset,
+    signInWithFirebaseEmail,
+    signInWithFirebaseGoogle,
+    signOutFirebase
+} from "../firebaseAuth";
 import BrandLogo from "../components/BrandLogo";
 import StudyArt from "../components/StudyArt";
 import "./Auth.css";
@@ -41,8 +52,93 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [googleReady, setGoogleReady] = useState(false);
     const googleButtonRef = useRef(null);
+    // Email/password handled by Firebase instead of the app's own email + OTP flow.
+    const [firebaseEmail, setFirebaseEmail] = useState(false);
+    const [firebaseVerificationPending, setFirebaseVerificationPending] = useState(false);
 
     const isRegister = mode === "register";
+
+    async function exchangeFirebaseToken(idToken, method, persist) {
+        const response = await fetch(`${apiBase}/auth/firebase`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                idToken,
+                ...(isRegister ? { role: registerRole } : {}),
+            }),
+        });
+        const data = await response.json().catch(() => ({}));
+        signOutFirebase().catch(() => {});
+        if (!response.ok) throw new Error(data.message || "Đăng nhập Firebase thất bại.");
+        saveAuthSession(data, persist);
+        trackEvent(isRegister ? "sign_up" : "login", { method, user_role: data.user.role });
+        onAuthenticated?.(data.user);
+        navigate(data.user.role === "Admin" ? "/admin/dashboard" : data.user.role === "Parent" ? "/parent/dashboard" : "/dashboard");
+    }
+
+    async function handleFirebaseGoogleLogin() {
+        setIsSubmitting(true);
+        setError("");
+        setSuccessMessage("");
+        try {
+            await exchangeFirebaseToken(await signInWithFirebaseGoogle(), "firebase_google", true);
+        } catch (firebaseError) {
+            setError(getFirebaseAuthErrorMessage(firebaseError, "Đăng nhập Google thất bại."));
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    async function handleFirebaseEmailSubmit() {
+        const email = values.email.trim();
+        if (forgotPassword) {
+            await sendFirebasePasswordReset(email);
+            setForgotPassword(false);
+            setSuccessMessage("Nếu email đã có tài khoản Firebase, liên kết đặt lại mật khẩu đã được gửi. Hãy kiểm tra hộp thư (cả thư mục spam).");
+            return;
+        }
+        if (isRegister && firebaseVerificationPending) {
+            const idToken = await getVerifiedFirebaseIdToken();
+            if (!idToken) throw new Error("Email chưa được xác minh. Hãy mở liên kết trong email rồi bấm lại nút này.");
+            await exchangeFirebaseToken(idToken, "firebase_email", true);
+            return;
+        }
+        if (isRegister) {
+            await registerWithFirebaseEmail(values.name.trim(), email, values.password);
+            setFirebaseVerificationPending(true);
+            setSuccessMessage(`Đã gửi email xác minh tới ${email}. Mở liên kết trong email rồi bấm "Tôi đã xác minh email".`);
+            return;
+        }
+        const idToken = await signInWithFirebaseEmail(email, values.password);
+        if (!idToken) throw new Error("Email chưa được xác minh. Chúng tôi vừa gửi lại liên kết xác minh, hãy mở email rồi đăng nhập lại.");
+        await exchangeFirebaseToken(idToken, "firebase_email", remember);
+    }
+
+    async function handleResendFirebaseVerification() {
+        setIsSubmitting(true);
+        setError("");
+        try {
+            await resendFirebaseVerificationEmail();
+            setSuccessMessage("Đã gửi lại email xác minh. Nếu chưa thấy, hãy kiểm tra thư mục spam.");
+        } catch (firebaseError) {
+            setError(getFirebaseAuthErrorMessage(firebaseError, "Không thể gửi lại email xác minh."));
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    function toggleFirebaseEmail() {
+        setFirebaseEmail((current) => !current);
+        setFirebaseVerificationPending(false);
+        signOutFirebase().catch(() => {});
+        setForgotPassword(false);
+        setError("");
+        setSuccessMessage("");
+        setErrors({});
+        setOtp("");
+        setOtpSent(false);
+        setOtpMessage("");
+    }
 
     const handleGoogleCredential = useCallback(async (credential) => {
         setIsSubmitting(true);
@@ -121,6 +217,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setOtp("");
         setOtpSent(false);
         setOtpMessage("");
+        setFirebaseVerificationPending(false);
     }
 
     function handleChange(event) {
@@ -136,6 +233,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setOtp("");
         setOtpSent(false);
         setOtpMessage("");
+        setFirebaseVerificationPending(false);
 
         setErrors((current) => ({
             ...current,
@@ -218,6 +316,11 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setError("");
 
         try {
+            if (firebaseEmail) {
+                await handleFirebaseEmailSubmit();
+                return;
+            }
+
             if (forgotPassword) {
                 const isConfirmingReset = otpSent;
                 const response = await fetch(`${apiBase}/auth/password-reset/${isConfirmingReset ? "confirm" : "request-otp"}`, {
@@ -310,8 +413,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             console.error("Auth error:", error);
 
             setError(
-                error.message ||
-                "Không thể kết nối tới máy chủ."
+                getFirebaseAuthErrorMessage(error, "Không thể kết nối tới máy chủ.")
             );
         } finally {
             setIsSubmitting(false);
@@ -445,7 +547,9 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
                         <p>
                             {forgotPassword
-                                ? "Nhận mã OTP qua email để tạo mật khẩu mới."
+                                ? firebaseEmail ? "Nhận liên kết qua email để tạo mật khẩu Firebase mới." : "Nhận mã OTP qua email để tạo mật khẩu mới."
+                                : firebaseEmail
+                                ? "Bạn đang dùng email & mật khẩu của Firebase."
                                 : isRegister
                                 ? "Tạo tài khoản để bắt đầu học Toán thật vui."
                                 : "Tiếp tục hành trình chinh phục Toán học của bạn."}
@@ -785,6 +889,12 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         )}
                         {successMessage && <p className="form-success" role="status">{successMessage}</p>}
 
+                        {firebaseEmail && isRegister && firebaseVerificationPending && (
+                            <button type="button" className="link-button firebase-resend" onClick={handleResendFirebaseVerification} disabled={isSubmitting}>
+                                Gửi lại email xác minh
+                            </button>
+                        )}
+
                         {/* SUBMIT */}
                         <button
                             className="submit-button"
@@ -793,6 +903,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         >
                             {isSubmitting
                                 ? "Đang xử lý..."
+                                : firebaseEmail
+                                    ? forgotPassword ? "Gửi liên kết đặt lại" : isRegister ? firebaseVerificationPending ? "Tôi đã xác minh email" : "Tạo tài khoản" : "Đăng nhập"
                                 : forgotPassword
                                     ? otpSent ? "Đổi mật khẩu" : "Gửi mã OTP"
                                     : isRegister
@@ -812,6 +924,15 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     </div>}
 
                     {!forgotPassword && (googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>)}
+
+                    {!forgotPassword && isFirebaseAuthConfigured && <div className="firebase-auth-options">
+                        <button className="google-button" type="button" onClick={handleFirebaseGoogleLogin} disabled={isSubmitting}>
+                            <span className="google-icon">G</span>Google qua Firebase
+                        </button>
+                        <button type="button" className="link-button" onClick={toggleFirebaseEmail} disabled={isSubmitting}>
+                            {firebaseEmail ? "← Dùng email & mã OTP của MathKids" : "Dùng email & mật khẩu Firebase"}
+                        </button>
+                    </div>}
 
                     {/* TERMS */}
                     {!forgotPassword && <p className="terms">

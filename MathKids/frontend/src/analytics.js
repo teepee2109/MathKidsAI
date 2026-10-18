@@ -1,14 +1,6 @@
 // Firebase Analytics (Google Analytics 4). Disabled unless VITE_FIREBASE_* is set,
 // and the SDK is loaded lazily so it does not weigh on the first page load.
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-};
+import { firebaseConfig, getFirebaseApp } from "./firebase";
 
 const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.appId && firebaseConfig.measurementId);
 let analyticsPromise;
@@ -16,10 +8,10 @@ let analyticsPromise;
 function loadAnalytics() {
   if (!isConfigured) return Promise.resolve(null);
   if (!analyticsPromise) {
-    analyticsPromise = Promise.all([import("firebase/app"), import("firebase/analytics")])
-      .then(async ([{ initializeApp }, analyticsModule]) => {
+    analyticsPromise = Promise.all([getFirebaseApp(), import("firebase/analytics")])
+      .then(async ([app, analyticsModule]) => {
         if (!(await analyticsModule.isSupported())) return null;
-        const analytics = analyticsModule.initializeAnalytics(initializeApp(firebaseConfig), {
+        const analytics = analyticsModule.initializeAnalytics(app, {
           config: {
             // Page views are sent by trackPageView on every route change instead.
             send_page_view: false,

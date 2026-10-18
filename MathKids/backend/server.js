@@ -6,7 +6,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { getPool, sql } from "./db.js";
-import { authenticate, loginUser, loginWithGoogle, registerUser, requireAdmin, requireParent, validateCredentials } from "./auth.js";
+import { authenticate, loginUser, loginWithFirebase, loginWithGoogle, registerUser, requireAdmin, requireParent, validateCredentials } from "./auth.js";
 import { sendPasswordResetOtpEmail, sendRegistrationOtpEmail } from "./emailService.js";
 import bcrypt from "bcrypt";
 
@@ -978,6 +978,15 @@ app.post("/api/auth/google", async (request, response) => {
     return response.json(await loginWithGoogle(request.body?.credential, requestedRole));
   }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Google thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
+});
+
+app.post("/api/auth/firebase", async (request, response) => {
+  try {
+    const requestedRole = ["Student", "Parent"].includes(request.body?.role) ? request.body.role : undefined;
+    if (requestedRole === "Parent") await ensureParentModuleSchema();
+    return response.json(await loginWithFirebase(request.body?.idToken, requestedRole));
+  }
+  catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Firebase thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
 
 app.get("/api/auth/me", authenticate, async (request, response) => {

@@ -89,6 +89,7 @@ DB_POOL_MAX=10
 JWT_SECRET=<chuỗi ngẫu nhiên>
 OTP_HASH_SECRET=<chuỗi ngẫu nhiên khác>
 GOOGLE_CLIENT_ID=<client-id>
+FIREBASE_PROJECT_ID=<project>    # Firebase Authentication — bỏ trống để tắt
 SMTP_...=<Gmail App Password>
 SEPAY_ENVIRONMENT=sandbox        # đổi thành production khi có tài khoản thật
 SEPAY_MERCHANT_ID=...
@@ -125,6 +126,8 @@ VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 EOF
 npm ci && npm run build          # tạo dist/
 ```
+
+Firebase Authentication (Google + Email/Password): trong Firebase Console > Authentication > Sign-in method bật **Google** và **Email/Password**; ở tab Settings > Authorized domains thêm tên miền production. Backend chỉ cần `FIREBASE_PROJECT_ID` để xác minh ID token, không cần service account.
 
 Biến `VITE_*` được gắn vào lúc build, nên sau khi sửa `.env` phải chạy lại `npm run build`.
 
