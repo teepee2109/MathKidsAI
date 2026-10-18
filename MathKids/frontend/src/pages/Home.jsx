@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import NotificationBell from "../components/NotificationBell";
 import StudyArt, { StudyIcon } from "../components/StudyArt";
 import "./Home.css";
 
@@ -17,13 +18,6 @@ function HeroArt() {
   return <div className="home-story-art"><StudyArt grade={1} /></div>;
 }
 
-function NotificationBell({ isAuthenticated }) {
-  const [open, setOpen] = useState(false);
-  return <div className="notification-wrap">
-    <button className="notification-button" aria-label="Mở thông báo" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>🔔</span><b>1</b></button>
-    {open && <div className="notification-panel"><div className="notification-heading"><strong>Thông báo</strong><small>1 mới</small></div><div className="notification-item"><span>🎉</span><div><strong>Chào mừng đến MathKids!</strong><p>{isAuthenticated ? "Hãy tiếp tục hành trình học toán của bạn." : "Đăng nhập để nhận gợi ý học tập riêng cho bạn."}</p></div></div>{!isAuthenticated && <Link to="/dang-nhap" className="notification-action">Đăng nhập để xem thêm →</Link>}</div>}
-  </div>;
-}
 
 function Home({ isAuthenticated = false, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);

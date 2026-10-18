@@ -20,6 +20,7 @@ const learningPathMigrationPath = fileURLToPath(new URL("./migrations/LearningPa
 const monthlyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/MonthlyAssessment.sql", import.meta.url));
 const weeklyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/WeeklyAssessment.sql", import.meta.url));
 const parentModuleMigrationPath = fileURLToPath(new URL("./migrations/ParentModule.sql", import.meta.url));
+const notificationMigrationPath = fileURLToPath(new URL("./migrations/Notification.sql", import.meta.url));
 const emailOtpMigrationPath = fileURLToPath(new URL("./migrations/EmailRegistrationOtp.sql", import.meta.url));
 const passwordResetOtpMigrationPath = fileURLToPath(new URL("./migrations/EmailPasswordResetOtp.sql", import.meta.url));
 const premiumPrice = 99000;
@@ -34,6 +35,7 @@ let learningPathSchemaPromise;
 let monthlyAssessmentSchemaPromise;
 let weeklyAssessmentSchemaPromise;
 let parentModuleSchemaPromise;
+let notificationSchemaPromise;
 let emailOtpSchemaPromise;
 let passwordResetOtpSchemaPromise;
 
@@ -259,6 +261,76 @@ parentModuleSchemaPromise = ensureQuestionBankSchema().then(async () => {
   }
 }
 
+async function ensureNotificationSchema() {
+  if (!notificationSchemaPromise) {
+    notificationSchemaPromise = getPool().then(async (pool) => {
+      const migration = await readFile(notificationMigrationPath, "utf8");
+      await pool.request().query(migration);
+    });
+  }
+  try {
+    await notificationSchemaPromise;
+  } catch (error) {
+    notificationSchemaPromise = undefined;
+    throw error;
+  }
+}
+
+// Notifications are a side effect: a failure here must never fail the action
+// that triggered it (payment, assessment, ...), so errors are only logged.
+async function createNotifications(items) {
+  if (!items.length) return;
+  try {
+    await ensureNotificationSchema();
+    const pool = await getPool();
+    for (const item of items) {
+      await pool.request()
+        .input("userId", sql.Int, item.userId)
+        .input("type", sql.VarChar(30), item.type)
+        .input("title", sql.NVarChar(200), item.title.slice(0, 200))
+        .input("message", sql.NVarChar(2000), item.message.slice(0, 2000))
+        .input("studentId", sql.Int, item.studentId ?? null)
+        .input("linkUrl", sql.NVarChar(300), item.linkUrl ?? null)
+        .query(`INSERT INTO [mk].[Notification] (UserId, NotificationType, Title, Message, RelatedStudentId, LinkUrl)
+                VALUES (@userId, @type, @title, @message, @studentId, @linkUrl)`);
+    }
+  } catch (error) {
+    console.error("[notification] Could not create notifications:", error.message);
+  }
+}
+
+// Sends one notification to every parent actively linked to the student.
+// `build` receives the student's display name and returns the notification fields.
+async function notifyLinkedParents(studentId, build) {
+  try {
+    await ensureParentModuleSchema();
+    const pool = await getPool();
+    const result = await pool.request().input("studentId", sql.Int, studentId).query(`
+      SELECT l.ParentUserId, u.DisplayName AS StudentName
+      FROM [mk].[ParentStudentLink] l
+      INNER JOIN [mk].[AppUser] u ON u.UserId = l.StudentId
+      WHERE l.StudentId = @studentId AND l.IsActive = 1`);
+    await createNotifications(result.recordset.map((row) => ({
+      ...build(row.StudentName || "Con"),
+      userId: row.ParentUserId,
+      studentId,
+    })));
+  } catch (error) {
+    console.error("[notification] Could not notify linked parents:", error.message);
+  }
+}
+
+function notifyParentsOfAssessment(studentId, label, score) {
+  return notifyLinkedParents(studentId, (name) => ({
+    type: score < 50 ? "LearningAlert" : "Recommendation",
+    title: score < 50 ? `${name} cần hỗ trợ thêm sau ${label}` : `${name} vừa hoàn thành ${label}`,
+    message: score < 50
+      ? `${name} đạt ${score}/100 điểm. Hãy xem báo cáo để biết phần kiến thức con cần ôn lại.`
+      : `${name} đạt ${score}/100 điểm. Xem báo cáo để theo dõi tiến bộ của con.`,
+    linkUrl: `/parent/children/${studentId}/report`,
+  }));
+}
+
 async function ensureEmailOtpSchema() {
   if (!emailOtpSchemaPromise) {
     emailOtpSchemaPromise = getPool().then(async (pool) => {
@@ -360,6 +432,17 @@ async function activatePremiumOrder(invoiceNumber, sepayOrderId = "", transactio
       .input("days", sql.Int, premiumDays)
       .query("IF NOT EXISTS (SELECT 1 FROM [mk].[PremiumSubscription] WHERE PaymentOrderId = @paymentOrderId) INSERT INTO [mk].[PremiumSubscription] (UserId, PaymentOrderId, PlanCode, StartsAt, ExpiresAt, Status) VALUES (@userId, @paymentOrderId, 'PREMIUM_MONTHLY', SYSUTCDATETIME(), DATEADD(day, @days, SYSUTCDATETIME()), 'Active')");
     await transaction.commit();
+    // Only the call that flipped the order to Paid notifies, so repeated IPNs
+    // and status polling don't create duplicates.
+    if (updateResult.rowsAffected[0]) {
+      await createNotifications([{
+        userId: order.UserId,
+        type: "System",
+        title: "Premium đã được kích hoạt 🎉",
+        message: `Thanh toán đơn ${invoiceNumber} thành công. Bạn có thể dùng mọi tính năng Premium trong ${premiumDays} ngày.`,
+        linkUrl: "/premium",
+      }]);
+    }
     return true;
   } catch (error) {
     await transaction.rollback().catch(() => {});
@@ -1432,6 +1515,8 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
     }
     }
     await transaction.commit();
+    transaction = undefined;
+    await notifyParentsOfAssessment(request.user.userId, "bài đánh giá đầu vào", overallScore);
     return response.json({ attemptId, ...summary, isPremium });
   } catch (error) {
     if (transaction) await transaction.rollback().catch(() => {});
@@ -1743,6 +1828,8 @@ app.post("/api/students/me/monthly-assessment/:attemptId/submit", authenticate, 
                   TotalStars = ISNULL(TotalStars, 0) + @rewardStars
               WHERE StudentId = @studentId`);
     await transaction.commit();
+    transaction = undefined;
+    await notifyParentsOfAssessment(request.user.userId, `bài kiểm tra tháng ${String(attempt.TestMonth).split("-").reverse().join("/")}`, score);
     return response.json({ attemptId, ...result, submittedAt: new Date().toISOString() });
   } catch (error) {
     if (transaction) await transaction.rollback().catch(() => {});
@@ -1932,6 +2019,8 @@ app.post("/api/students/me/weekly-assessment/:attemptId/submit", authenticate, a
     await transaction.request().input("attemptId", sql.BigInt, attemptId).input("score", sql.TinyInt, score).input("correct", sql.TinyInt, correctCount)
       .query("UPDATE [mk].[WeeklyAssessmentAttempt] SET Score = @score, CorrectCount = @correct, SubmittedAt = SYSUTCDATETIME() WHERE AttemptId = @attemptId AND SubmittedAt IS NULL");
     await transaction.commit();
+    transaction = undefined;
+    await notifyParentsOfAssessment(request.user.userId, "bài đánh giá năng lực tuần", score);
     return response.json({ attemptId, weekStart: attempt.WeekStart, grade: Number(attempt.Grade), difficulty: Number(attempt.Difficulty), score, correctCount, totalCount: 10, review });
   } catch (error) {
     if (transaction) await transaction.rollback().catch(() => {});
@@ -2500,6 +2589,7 @@ app.get("/api/students/me/rewards", authenticate, async (request, response) => {
     const totalXp = Number(student.TotalXp || 0);
     let totalStars = Number(student.TotalStars || 0);
     let newlyAwardedStars = 0;
+    const newlyAwardedBadges = [];
     const awardedResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
       .query("SELECT BadgeCode FROM [mk].[StudentBadgeAward] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId");
     const awardedCodes = new Set(awardedResult.recordset.map((row) => row.BadgeCode));
@@ -2510,6 +2600,7 @@ app.get("/api/students/me/rewards", authenticate, async (request, response) => {
         .input("stars", sql.Int, badge.starsReward)
         .query("INSERT INTO [mk].[StudentBadgeAward] (StudentId, BadgeCode, StarsAwarded) VALUES (@studentId, @badgeCode, @stars)");
       newlyAwardedStars += badge.starsReward;
+      newlyAwardedBadges.push(badge);
     }
     if (newlyAwardedStars) {
       await transaction.request().input("studentId", sql.Int, request.user.userId).input("stars", sql.Int, newlyAwardedStars)
@@ -2519,6 +2610,23 @@ app.get("/api/students/me/rewards", authenticate, async (request, response) => {
     const inventoryResult = await transaction.request().input("studentId", sql.Int, request.user.userId)
       .query("SELECT RewardCode, IsEquipped FROM [mk].[StudentRewardInventory] WHERE StudentId = @studentId");
     await transaction.commit();
+    transaction = undefined;
+    for (const badge of newlyAwardedBadges) {
+      await createNotifications([{
+        userId: request.user.userId,
+        type: "Achievement",
+        title: `Em nhận huy hiệu ${badge.name} ${badge.icon}`,
+        message: `Em đã ${badge.description.toLowerCase()} và được thưởng ${badge.starsReward} sao. Giỏi lắm!`,
+        studentId: request.user.userId,
+        linkUrl: "/phan-thuong",
+      }]);
+      await notifyLinkedParents(request.user.userId, (name) => ({
+        type: "Achievement",
+        title: `${name} nhận huy hiệu ${badge.name} ${badge.icon}`,
+        message: `${name} đã ${badge.description.toLowerCase()}. Hãy khen con nhé!`,
+        linkUrl: `/parent/children/${request.user.userId}/report`,
+      }));
+    }
     const ownedCodes = inventoryResult.recordset.map((item) => item.RewardCode);
     const equippedRewards = inventoryResult.recordset.filter((item) => item.IsEquipped).map((item) => item.RewardCode);
     const equippedReward = equippedRewards[0] || "";
@@ -3032,6 +3140,14 @@ app.post("/api/parents/me/children/create", authenticate, requireParent, async (
         .input("studentId", sql.Int, newUser.UserId)
         .query("INSERT INTO [mk].[ParentStudentLink] (ParentUserId, StudentId) VALUES (@parentId, @studentId)");
       await transaction.commit();
+      await createNotifications([{
+        userId: request.user.userId,
+        type: "System",
+        title: `Đã tạo tài khoản cho ${newUser.DisplayName}`,
+        message: `Con có thể đăng nhập bằng email ${newUser.Email}. Bạn sẽ nhận thông báo khi con hoàn thành bài kiểm tra hoặc đạt huy hiệu.`,
+        studentId: newUser.UserId,
+        linkUrl: "/parent/dashboard",
+      }]);
       return response.status(201).json({
         success: true,
         child: { studentId: newUser.UserId, name: newUser.DisplayName, email: newUser.Email, grade: studentGrade },
@@ -3088,6 +3204,23 @@ app.post("/api/parents/me/children/link", authenticate, requireParent, async (re
         .query("UPDATE [mk].[ChildLinkInvite] SET IsUsed = 1 WHERE InviteId = @inviteId");
       await transaction.commit();
     } catch (err) { await transaction.rollback().catch(() => {}); throw err; }
+    await createNotifications([
+      {
+        userId: request.user.userId,
+        type: "System",
+        title: `Đã liên kết với ${invite.DisplayName}`,
+        message: `Bạn sẽ nhận thông báo khi ${invite.DisplayName} hoàn thành bài kiểm tra hoặc đạt huy hiệu mới.`,
+        studentId: invite.StudentId,
+        linkUrl: "/parent/dashboard",
+      },
+      {
+        userId: invite.StudentId,
+        type: "System",
+        title: "Phụ huynh đã liên kết với tài khoản của em 👨‍👩‍👧",
+        message: "Bố mẹ giờ có thể theo dõi tiến bộ học tập của em. Cùng cố gắng mỗi ngày nhé!",
+        studentId: invite.StudentId,
+      },
+    ]);
     return response.json({ success: true, child: { studentId: invite.StudentId, name: invite.DisplayName, grade: invite.Grade } });
   } catch (error) {
     if (error.number === 2627 || error.number === 2601) return response.status(409).json({ message: "Bạn đã liên kết với học sinh này rồi." });
@@ -3336,6 +3469,79 @@ app.get("/api/parents/me/children/:studentId/recommendations", authenticate, req
 
 const bugReportRateLimit = new Map();
 
+// ──────────────────────────────────────────────────────────
+// NOTIFICATIONS — chuông thông báo của người dùng
+// ──────────────────────────────────────────────────────────
+function mapNotification(row) {
+  return {
+    id: Number(row.NotificationId),
+    type: row.NotificationType,
+    title: row.Title,
+    message: row.Message,
+    studentId: row.RelatedStudentId,
+    linkUrl: row.LinkUrl || "",
+    isRead: Boolean(row.IsRead),
+    createdAt: row.CreatedAt,
+  };
+}
+
+app.get("/api/notifications", authenticate, async (request, response) => {
+  const limit = Math.min(Math.max(Number.parseInt(request.query.limit, 10) || 20, 1), 50);
+  try {
+    await ensureNotificationSchema();
+    const pool = await getPool();
+    const userId = request.user.userId;
+    // Every account gets a welcome notification the first time it opens the bell,
+    // which covers email, Google and parent-created sign-ups alike.
+    await pool.request().input("userId", sql.Int, userId)
+      .input("title", sql.NVarChar(200), "Chào mừng đến MathKids! 🎉")
+      .input("message", sql.NVarChar(2000), request.user.role === "Parent"
+        ? "Liên kết tài khoản của con để nhận thông báo khi con hoàn thành bài kiểm tra hoặc đạt huy hiệu."
+        : "Mỗi ngày học một chút, em sẽ nhận sao và huy hiệu. Bắt đầu hành trình học Toán nào!")
+      .input("linkUrl", sql.NVarChar(300), request.user.role === "Parent" ? "/parent/link-child" : "/dashboard")
+      .query(`IF NOT EXISTS (SELECT 1 FROM [mk].[Notification] WHERE UserId = @userId)
+                INSERT INTO [mk].[Notification] (UserId, NotificationType, Title, Message, LinkUrl)
+                VALUES (@userId, 'System', @title, @message, @linkUrl)`);
+    const result = await pool.request().input("userId", sql.Int, userId).input("limit", sql.Int, limit).query(`
+      SELECT TOP (@limit) NotificationId, NotificationType, Title, Message, RelatedStudentId, LinkUrl, IsRead, CreatedAt
+      FROM [mk].[Notification] WHERE UserId = @userId ORDER BY CreatedAt DESC, NotificationId DESC;
+      SELECT COUNT(*) AS UnreadCount FROM [mk].[Notification] WHERE UserId = @userId AND IsRead = 0;`);
+    return response.json({
+      items: result.recordsets[0].map(mapNotification),
+      unreadCount: Number(result.recordsets[1][0].UnreadCount),
+    });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải thông báo.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.patch("/api/notifications/:id/read", authenticate, async (request, response) => {
+  const notificationId = Number(request.params.id);
+  if (!Number.isSafeInteger(notificationId) || notificationId <= 0) return response.status(400).json({ message: "Mã thông báo không hợp lệ." });
+  try {
+    await ensureNotificationSchema();
+    const pool = await getPool();
+    const result = await pool.request().input("id", sql.BigInt, notificationId).input("userId", sql.Int, request.user.userId)
+      .query("UPDATE [mk].[Notification] SET IsRead = 1, ReadAt = COALESCE(ReadAt, SYSUTCDATETIME()) WHERE NotificationId = @id AND UserId = @userId");
+    if (!result.rowsAffected[0]) return response.status(404).json({ message: "Không tìm thấy thông báo." });
+    return response.json({ success: true });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể cập nhật thông báo.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.post("/api/notifications/read-all", authenticate, async (request, response) => {
+  try {
+    await ensureNotificationSchema();
+    const pool = await getPool();
+    await pool.request().input("userId", sql.Int, request.user.userId)
+      .query("UPDATE [mk].[Notification] SET IsRead = 1, ReadAt = SYSUTCDATETIME() WHERE UserId = @userId AND IsRead = 0");
+    return response.json({ success: true });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể cập nhật thông báo.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
 function cleanBugReportValue(value, maxLength) {
   return typeof value === "string"
     ? value.trim().slice(0, maxLength)
@@ -3545,7 +3751,7 @@ app.post("/api/bug-reports", async (request, response) => {
 app.use((_request, response) => response.status(404).json({ message: "Không tìm thấy API." }));
 app.listen(port, () => {
   console.log(`MathKids API đang chạy tại http://localhost:${port}`);
-  ensureDailyChallengeSchema().then(() => ensureLearningPathSchema()).then(() => ensureMonthlyAssessmentSchema()).then(() => ensureWeeklyAssessmentSchema()).then(() => ensureParentModuleSchema())
-    .then(() => console.log("Đã sẵn sàng thử thách, phần thưởng, Question Bank, lộ trình học, bài kiểm tra tuần, tháng và module phụ huynh."))
+  ensureDailyChallengeSchema().then(() => ensureLearningPathSchema()).then(() => ensureMonthlyAssessmentSchema()).then(() => ensureWeeklyAssessmentSchema()).then(() => ensureParentModuleSchema()).then(() => ensureNotificationSchema())
+    .then(() => console.log("Đã sẵn sàng thử thách, phần thưởng, Question Bank, lộ trình học, bài kiểm tra tuần, tháng, module phụ huynh và thông báo."))
     .catch((error) => console.error("Không thể chuẩn bị dữ liệu học tập:", error.message));
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import NotificationBell from "../components/NotificationBell";
 import StudyArt, { StudyIcon } from "../components/StudyArt";
 import { getAuthToken, getCachedUser, resolveAvatarUrl, saveCachedUser } from "../authStorage";
 import { apiFetch, apiUrl } from "../api";
@@ -320,7 +321,7 @@ export default function StudentDashboard({ onLogout }) {
     <header className="dashboard-header">
       <BrandLogo className="dashboard-brand" to="/dashboard" />
       <nav aria-label="Điều hướng học sinh"><a className="selected" href="#dashboard"><StudyIcon name="home" /><span>Góc học</span></a><Link to="/hoc-tap"><StudyIcon name="book" /><span>Bài học</span></Link><Link to="/tro-choi"><StudyIcon name="game" /><span>Trò chơi</span></Link><a href="#challenge"><StudyIcon name="flag" /><span>Thử thách</span></a><Link to="/lien-he"><StudyIcon name="help" /><span>Hỗ trợ</span></Link></nav>
-      <div className="dashboard-account"><Link className="sky-star-wallet" to="/phan-thuong"><StudyIcon name="star" /><span>{loading ? "…" : (student?.totalStars ?? 0)} sao của em</span></Link><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedFrame ? `reward-frame-${equippedFrame.replace("-frame", "")}` : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#ffe25a" stroke="#eba528" strokeWidth="3" /><circle cx="17" cy="20" r="2" fill="#b8751e" /><circle cx="31" cy="20" r="2" fill="#b8751e" /><path d="M16 28q8 10 16 0" fill="none" stroke="#b8751e" strokeWidth="3" strokeLinecap="round" /></svg>}</span><span className="account-name">{student?.name || "Học sinh"}<span className="sky-profile-grade"> · Lớp {grade}</span></span></Link><button onClick={onLogout}>Đăng xuất</button></div>
+      <div className="dashboard-account"><NotificationBell /><Link className="sky-star-wallet" to="/phan-thuong"><StudyIcon name="star" /><span>{loading ? "…" : (student?.totalStars ?? 0)} sao của em</span></Link><Link to="/ho-so" className="dashboard-profile-link" style={{ color: "inherit", textDecoration: "none" }}><span className={`dashboard-avatar ${equippedFrame ? `reward-frame-${equippedFrame.replace("-frame", "")}` : ""}`}>{student?.avatarUrl && !avatarBroken ? <img src={resolveAvatarUrl(student.avatarUrl)} alt="" onError={() => setAvatarBroken(true)} /> : <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="#ffe25a" stroke="#eba528" strokeWidth="3" /><circle cx="17" cy="20" r="2" fill="#b8751e" /><circle cx="31" cy="20" r="2" fill="#b8751e" /><path d="M16 28q8 10 16 0" fill="none" stroke="#b8751e" strokeWidth="3" strokeLinecap="round" /></svg>}</span><span className="account-name">{student?.name || "Học sinh"}<span className="sky-profile-grade"> · Lớp {grade}</span></span></Link><button onClick={onLogout}>Đăng xuất</button></div>
     </header>
 
     <div className="dashboard-content" id="dashboard">

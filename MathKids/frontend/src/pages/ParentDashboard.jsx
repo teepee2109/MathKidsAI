@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import NotificationBell from "../components/NotificationBell";
 import { getCachedUser } from "../authStorage";
 import { getChildren, unlinkChild } from "../services/parentService";
 import "./ParentDashboard.css";
@@ -51,6 +52,7 @@ export default function ParentDashboard({ onLogout }) {
         <header className="parent-topbar">
           <div><span className="parent-breadcrumb">MathKids /</span> Phụ huynh</div>
           <div className="parent-user">
+            <NotificationBell />
             <span className="parent-avatar-icon">👤</span>
             <span>{parent?.name || "Phụ huynh"}<small>Parent</small></span>
             <button onClick={onLogout}>Đăng xuất</button>
