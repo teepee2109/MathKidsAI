@@ -10,7 +10,6 @@ import {
     resendFirebaseVerificationEmail,
     sendFirebasePasswordReset,
     signInWithFirebaseEmail,
-    signInWithFirebaseGoogle,
     signOutFirebase
 } from "../firebaseAuth";
 import BrandLogo from "../components/BrandLogo";
@@ -74,19 +73,6 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         trackEvent(isRegister ? "sign_up" : "login", { method, user_role: data.user.role });
         onAuthenticated?.(data.user);
         navigate(data.user.role === "Admin" ? "/admin/dashboard" : data.user.role === "Parent" ? "/parent/dashboard" : "/dashboard");
-    }
-
-    async function handleFirebaseGoogleLogin() {
-        setIsSubmitting(true);
-        setError("");
-        setSuccessMessage("");
-        try {
-            await exchangeFirebaseToken(await signInWithFirebaseGoogle(), "firebase_google", true);
-        } catch (firebaseError) {
-            setError(getFirebaseAuthErrorMessage(firebaseError, "Đăng nhập Google thất bại."));
-        } finally {
-            setIsSubmitting(false);
-        }
     }
 
     async function handleFirebaseEmailSubmit() {
@@ -926,9 +912,6 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     {!forgotPassword && (googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>)}
 
                     {!forgotPassword && isFirebaseAuthConfigured && <div className="firebase-auth-options">
-                        <button className="google-button" type="button" onClick={handleFirebaseGoogleLogin} disabled={isSubmitting}>
-                            <span className="google-icon">G</span>Google qua Firebase
-                        </button>
                         <button type="button" className="link-button" onClick={toggleFirebaseEmail} disabled={isSubmitting}>
                             {firebaseEmail ? "← Dùng email & mã OTP của MathKids" : "Dùng email & mật khẩu Firebase"}
                         </button>

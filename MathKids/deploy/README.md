@@ -127,7 +127,7 @@ EOF
 npm ci && npm run build          # tạo dist/
 ```
 
-Firebase Authentication (Google + Email/Password): trong Firebase Console > Authentication > Sign-in method bật **Google** và **Email/Password**; ở tab Settings > Authorized domains thêm tên miền production. Backend chỉ cần `FIREBASE_PROJECT_ID` để xác minh ID token, không cần service account.
+Firebase Authentication (Email/Password; đăng nhập Google vẫn dùng `GOOGLE_CLIENT_ID`): trong Firebase Console > Authentication > Sign-in method bật **Email/Password**; ở tab Settings > Authorized domains thêm tên miền production. Backend chỉ cần `FIREBASE_PROJECT_ID` để xác minh ID token, không cần service account.
 
 Biến `VITE_*` được gắn vào lúc build, nên sau khi sửa `.env` phải chạy lại `npm run build`.
 

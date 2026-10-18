@@ -420,7 +420,8 @@ export async function loginWithFirebase(idToken, requestedRole) {
         error.status = 401;
         throw error;
     }
-    if (!["google.com", "password"].includes(firebaseUser.firebase?.sign_in_provider) || !firebaseUser.email) {
+    // Google sign-in goes through loginWithGoogle; Firebase is only used for email/password.
+    if (firebaseUser.firebase?.sign_in_provider !== "password" || !firebaseUser.email) {
         const error = new Error("Phương thức đăng nhập Firebase này không được hỗ trợ.");
         error.status = 401;
         throw error;

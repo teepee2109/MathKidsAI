@@ -1,4 +1,5 @@
-// Firebase Authentication (Google + Email/Password). Firebase only proves who the user is:
+// Firebase Authentication (Email/Password; Google sign-in uses Google Identity Services in Auth.jsx).
+// Firebase only proves who the user is:
 // the ID token is exchanged at /api/auth/firebase for the app's own JWT session.
 import { firebaseConfig, getFirebaseApp } from "./firebase";
 
@@ -11,9 +12,6 @@ const errorMessages = {
   "auth/weak-password": "Mật khẩu cần có ít nhất 6 ký tự.",
   "auth/too-many-requests": "Bạn thử quá nhiều lần. Vui lòng đợi một lúc rồi thử lại.",
   "auth/user-disabled": "Tài khoản Firebase này đã bị khóa.",
-  "auth/popup-blocked": "Trình duyệt đã chặn cửa sổ đăng nhập. Hãy cho phép popup rồi thử lại.",
-  "auth/popup-closed-by-user": "Bạn đã đóng cửa sổ đăng nhập Google.",
-  "auth/cancelled-popup-request": "Bạn đã đóng cửa sổ đăng nhập Google.",
   "auth/network-request-failed": "Không thể kết nối tới Firebase. Hãy kiểm tra mạng.",
   "auth/operation-not-allowed": "Phương thức đăng nhập này chưa được bật trong Firebase Console.",
   "auth/unauthorized-domain": "Tên miền này chưa được thêm vào Authorized domains trong Firebase Console.",
@@ -29,20 +27,12 @@ function loadAuth() {
   if (!authPromise) {
     authPromise = Promise.all([getFirebaseApp(), import("firebase/auth")]).then(([app, sdk]) => {
       // In-memory only: the session lives in the app's JWT, not in Firebase's IndexedDB.
-      const auth = sdk.initializeAuth(app, { persistence: sdk.inMemoryPersistence, popupRedirectResolver: sdk.browserPopupRedirectResolver });
+      const auth = sdk.initializeAuth(app, { persistence: sdk.inMemoryPersistence });
       auth.languageCode = "vi";
       return { auth, sdk };
     });
   }
   return authPromise;
-}
-
-export async function signInWithFirebaseGoogle() {
-  const { auth, sdk } = await loadAuth();
-  const provider = new sdk.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  const { user } = await sdk.signInWithPopup(auth, provider);
-  return user.getIdToken();
 }
 
 // Returns an ID token, or null when the email is not verified yet (a new verification email is sent).
