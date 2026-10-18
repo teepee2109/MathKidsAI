@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAuthSession } from "../authStorage";
+import { trackEvent } from "../analytics";
 import BrandLogo from "../components/BrandLogo";
 import StudyArt from "../components/StudyArt";
 import "./Auth.css";
@@ -58,6 +59,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.message || "Đăng nhập Google thất bại.");
             saveAuthSession(data, true);
+            trackEvent(mode === "register" ? "sign_up" : "login", { method: "google", user_role: data.user.role });
             onAuthenticated?.(data.user);
             navigate(data.user.role === "Admin" ? "/admin/dashboard" : data.user.role === "Parent" ? "/parent/dashboard" : "/dashboard");
         } catch (googleError) {
@@ -298,6 +300,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
             // Persist login only when the user selected "remember me".
             saveAuthSession(data, isRegister || remember);
+            trackEvent(isRegister ? "sign_up" : "login", { method: "email", user_role: data.user.role });
 
             // Đăng nhập / đăng ký thành công
             onAuthenticated?.(data.user);

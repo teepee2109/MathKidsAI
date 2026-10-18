@@ -5,6 +5,7 @@ import StudyArt from "../components/StudyArt";
 import { getAuthToken, getCachedUser } from "../authStorage";
 import { apiFetch } from "../api";
 import { getLearningPath } from "../services/learning";
+import { trackEvent } from "../analytics";
 import "./PlacementAssessment.css";
 import "./StudentAssessmentRewards.css";
 
@@ -150,6 +151,7 @@ export default function PlacementAssessment() {
         const learningPath = await getLearningPath();
         setLearningLessons(learningPath.lessons || []);
       } catch { /* The result remains available; links can still open the lesson list. */ }
+      trackEvent("assessment_complete", { assessment_type: "placement", score: data.overallScore, grade: Number(data.grade) });
       setIsPremium(Boolean(data.isPremium));
       setResult(data); setAttempt(null);
       setHistory((current) => [{ attemptId: data.attemptId, grade: data.grade, score: data.overallScore, submittedAt: new Date().toISOString(), summary: data.advice?.summary || "Đã hoàn thành bài đánh giá." }, ...current]);

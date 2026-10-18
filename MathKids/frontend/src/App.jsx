@@ -18,16 +18,26 @@ import ParentChildReport from "./pages/ParentChildReport";
 import ParentAlerts from "./pages/ParentAlerts";
 import ParentRecommendations from "./pages/ParentRecommendations";
 import Contact from "./pages/Contact";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { clearAuthSession, getAuthToken, getCachedUser } from "./authStorage";
 import BugReportButton from "./components/BugReportButton";
+import { setAnalyticsUser, trackPageView } from "./analytics";
 
 
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getAuthToken()));
   const [currentUser, setCurrentUser] = useState(getCachedUser);
+
+  useEffect(() => {
+    setAnalyticsUser(isAuthenticated ? currentUser : null);
+  }, [isAuthenticated, currentUser]);
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
 
   function handleAuthenticated(user) {
     setCurrentUser(user);

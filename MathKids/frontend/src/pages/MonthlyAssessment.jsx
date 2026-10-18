@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import { getMonthlyAssessment, startMonthlyAssessment, submitMonthlyAssessment } from "../services/monthlyAssessment";
+import { trackEvent } from "../analytics";
 import "./MonthlyAssessment.css";
 
 function monthLabel(month) {
@@ -86,6 +87,7 @@ export default function MonthlyAssessment({ onLogout }) {
       const submitted = await submitMonthlyAssessment(current.attemptId,
         questions.map((item) => ({ questionId: item.questionId, answer: answers[item.questionId] })));
       sessionStorage.removeItem(attemptKey(current.attemptId));
+      trackEvent("assessment_complete", { assessment_type: "monthly", score: submitted.score, grade: submitted.grade });
       const completed = { ...current, ...submitted, status: "Completed", result: submitted };
       setCurrent(completed);
       setData((existing) => ({

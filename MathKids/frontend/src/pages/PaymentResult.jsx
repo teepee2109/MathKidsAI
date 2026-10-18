@@ -2,7 +2,25 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiUrl } from "../api";
 import { getAuthToken, getCachedUser, saveCachedUser } from "../authStorage";
+import { trackEvent } from "../analytics";
 import "./PaymentResult.css";
+
+const PREMIUM_PRICE = 99000;
+
+// The result page can be reloaded or polled several times; report each invoice once.
+function trackPurchaseOnce(invoice) {
+  const key = `mathkids-purchase-tracked-${invoice}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+  } catch { /* Storage blocked: still report, a rare duplicate is acceptable. */ }
+  trackEvent("purchase", {
+    transaction_id: invoice,
+    currency: "VND",
+    value: PREMIUM_PRICE,
+    items: [{ item_id: "PREMIUM_MONTHLY", item_name: "MathKids Premium 30 ngày", price: PREMIUM_PRICE, quantity: 1 }],
+  });
+}
 
 export default function PaymentResult() {
   const { status } = useParams();
@@ -28,6 +46,7 @@ export default function PaymentResult() {
       if (!active) return;
       setPayment(data.payment || null);
       if (data.payment?.status === "Paid") {
+        trackPurchaseOnce(invoice);
         const cachedUser = getCachedUser();
         if (cachedUser) {
           saveCachedUser({

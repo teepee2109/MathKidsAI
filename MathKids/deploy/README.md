@@ -114,9 +114,19 @@ cd /var/www/mathkid/MathKids/frontend
 cat > .env <<'EOF'
 VITE_API_URL=/api
 VITE_GOOGLE_CLIENT_ID=<client-id>
+# Firebase Analytics — bỏ trống để tắt
+VITE_FIREBASE_API_KEY=<api-key>
+VITE_FIREBASE_AUTH_DOMAIN=<project>.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=<project>
+VITE_FIREBASE_STORAGE_BUCKET=<project>.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=<sender-id>
+VITE_FIREBASE_APP_ID=<app-id>
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 EOF
 npm ci && npm run build          # tạo dist/
 ```
+
+Biến `VITE_*` được gắn vào lúc build, nên sau khi sửa `.env` phải chạy lại `npm run build`.
 
 ## 6. Cloudflare
 

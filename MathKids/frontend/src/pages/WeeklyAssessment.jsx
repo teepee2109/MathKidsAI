@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import { getWeeklyAssessment, startWeeklyAssessment, submitWeeklyAssessment } from "../services/weeklyAssessment";
+import { trackEvent } from "../analytics";
 import "./WeeklyAssessment.css";
 
 const levelNames = { 1: "Cơ bản", 2: "Trung bình", 3: "Nâng cao" };
@@ -72,6 +73,7 @@ export default function WeeklyAssessment({ onLogout }) {
       const submitted = await submitWeeklyAssessment(current.attemptId,
         questions.map((item) => ({ questionId: item.questionId, answer: answers[item.questionId] })));
       sessionStorage.removeItem(`mathkids-weekly-${current.attemptId}`);
+      trackEvent("assessment_complete", { assessment_type: "weekly", score: submitted.score, grade: submitted.grade });
       const completed = { ...current, ...submitted, status: "Completed", result: submitted };
       setCurrent(completed);
       setData((existing) => ({ ...existing, current: completed,
