@@ -1,23 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
-import StudyArt, { MathPicture, StudyIcon } from "../components/StudyArt";
+import StudyArt, { ElementaryLessonVisual, MathPicture, StudyIcon } from "../components/StudyArt";
 import { getQuestions, submitQuestionAnswer } from "../services/questions";
 import { completeLesson, getLearningPath } from "../services/learning";
+import LessonGuide from "./LessonGuide";
 import "./LearningPath.css";
 import "./LearningStudy.css";
 import "./LearningTheory.css";
 
 function TheoryDetails({ text }) {
-  const parts = String(text || "").split(/\s*•\s*/).filter(Boolean);
-  if (parts.length < 2) return <p>{text}</p>;
-  if (String(text || "").trimStart().startsWith("•")) {
-    return <ul className="learning-theory-points">{parts.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>;
-  }
-  const [explanation, ...points] = parts;
+  const source = String(text || "").trim();
+  const startsWithBullet = source.startsWith("•");
+  const parts = source.split(/\s*•\s*/).filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1 && !startsWithBullet) return <p>{parts[0]}</p>;
+  const [explanation, ...remaining] = startsWithBullet ? ["", ...parts] : parts;
+  const warnings = remaining.filter((point) => /^(Hay nhầm|Hay sai|Lỗi thường gặp|Dễ nhầm|Chú ý):/i.test(point));
+  const points = remaining.filter((point) => !warnings.includes(point));
   return <>
     {explanation && <p>{explanation}</p>}
-    <ul className="learning-theory-points">{points.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>
+    {points.length > 0 && <ul className="learning-theory-points">{points.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>}
+    {warnings.length > 0 && <aside className="learning-theory-warning"><strong>⚠️ Lỗi dễ gặp</strong><ul>{warnings.map((point) => <li key={point}>{point.replace(/^(Hay nhầm|Hay sai|Lỗi thường gặp|Dễ nhầm|Chú ý):\s*/i, "")}</li>)}</ul></aside>}
   </>;
 }
 
@@ -34,6 +38,33 @@ function WorkedExampleDetails({ text }) {
   return <>
     {introduction && <p>{introduction}</p>}
     <ol className="learning-example-steps">{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>
+  </>;
+}
+
+function YoungLearnerTheory({ introduction, keyConcept, topic, title, grade }) {
+  const points = String(keyConcept || "").split(/\s*•\s*/).filter(Boolean);
+  const mainIdea = points[0] || keyConcept;
+  return <>
+    <ElementaryLessonVisual topic={topic} title={title} grade={grade} />
+    <p className="learning-young-intro">{introduction}</p>
+    {mainIdea && <div className="learning-young-rule"><span aria-hidden="true">💡</span><div><strong>Em nhớ nhé</strong><p>{mainIdea}</p></div></div>}
+    {points.length > 1 && <div className="learning-young-full-theory"><strong>📘 Mình cùng tìm hiểu kỹ hơn</strong><TheoryDetails text={points.slice(1).join(" • ")} /></div>}
+  </>;
+}
+
+function YoungLearnerExample({ text }) {
+  const source = String(text || "");
+  const markers = [...source.matchAll(/(?:^|\s)(\d+)\)\s*/g)];
+  if (!markers.length) return <p>{source}</p>;
+  const introduction = source.slice(0, markers[0].index).trim();
+  const steps = markers.map((marker, index) => {
+    const start = marker.index + marker[0].length;
+    const end = markers[index + 1]?.index ?? source.length;
+    return source.slice(start, end).trim();
+  });
+  return <>
+    {introduction && <p className="learning-young-example-lead">{introduction}</p>}
+    <ol className="learning-young-example-steps">{steps.map((step, index) => <li key={`${index}-${step}`}><span>{index + 1}</span><p>{step}</p></li>)}</ol>
   </>;
 }
 
@@ -171,25 +202,27 @@ export default function LearningPath({ onLogout }) {
       <Link className="learning-back" to="/dashboard">← Về góc học</Link>
       {error && <div className="learning-alert" role="alert">{error}<button onClick={loadPath}>Thử lại</button></div>}
       {loading ? <div className="learning-loading" role="status">Đang tải lộ trình học…</div> : pathData && <>
-        <section className="learning-path-heading"><div><span className="learning-kicker">{["AI", "Gemini", "ChatGPT"].includes(pathData.generatedBy) ? `LỘ TRÌNH ${pathData.generatedBy === "AI" ? "AI" : pathData.generatedBy.toUpperCase()} ĐỀ XUẤT` : pathData.premiumRequired ? "BÀI HỌC THEO CHƯƠNG TRÌNH" : "LỘ TRÌNH CÁ NHÂN HÓA"} · LỚP {pathData.grade}</span><h1>Học tập theo từng bước</h1><p>Bài học theo chương trình, ưu tiên nội dung trong kết quả đánh giá và phần bạn cần củng cố.</p></div><div className="learning-completion-count"><strong>{pathData.completedCount}</strong><span>/ {pathData.lessons.length} bài hoàn thành</span></div></section>
+        <section className="learning-path-heading"><div><span className="learning-kicker">{["AI", "Gemini", "ChatGPT"].includes(pathData.generatedBy) ? `LỘ TRÌNH ${pathData.generatedBy === "AI" ? "AI" : pathData.generatedBy.toUpperCase()} ĐỀ XUẤT` : pathData.premiumRequired ? "BÀI HỌC THEO CHƯƠNG TRÌNH" : "LỘ TRÌNH CÁ NHÂN HÓA"} · LỚP {pathData.grade}</span><h1>Học tập theo từng bước</h1><p>Bài học theo chương trình, ưu tiên nội dung trong kết quả đánh giá và phần bạn cần củng cố.</p></div><div className="learning-completion-count"><strong>{pathData.completedCount + (pathData.masteredCount || 0)}</strong><span>/ {pathData.lessons.length} bài hoàn thành hoặc đã vững</span></div></section>
         {pathData.premiumRequired && <div role="note" style={{ marginTop: 12, padding: "12px 16px", border: "1px solid #f1dfb6", borderRadius: 12, background: "#fffaf0", color: "#80652d", fontSize: 12 }}>Đang xem các bài học cơ bản theo lớp. <Link to="/premium" style={{ color: "#3478ce", fontWeight: 900 }}>Mở khóa gợi ý cá nhân hóa với Premium →</Link></div>}
         <div className="learning-path-layout">
           <details className="study-lesson-outline" open={!lessonId}>
             <summary>Các bài học của em</summary>
           <section className="learning-path-list" aria-label="Danh sách bài học">
-            <div className="learning-recommendation"><span>🧭</span><div><small>BÀI HỌC ĐƯỢC GỢI Ý</small><strong>{pathData.lessons.find((item) => item.lessonId === pathData.recommendedLessonId)?.title || "Bạn đã hoàn thành lộ trình!"}</strong><p>{pathData.recommendation}</p></div></div>
-            {pathData.lessons.map((item, index) => <Link key={item.lessonId} to={item.isLocked ? "/hoc-tap" : `/hoc-tap/${item.lessonId}`} aria-disabled={item.isLocked} onClick={(event) => { if (item.isLocked) event.preventDefault(); }} className={`learning-path-item ${String(item.lessonId) === lessonId ? "is-selected" : ""} ${item.isCompleted ? "is-completed" : ""} ${item.isLocked ? "is-locked" : ""}`}><span className="learning-step-number">{item.isCompleted ? "✓" : item.isLocked ? "🔒" : String(index + 1).padStart(2, "0")}</span><span className="learning-step-copy"><small>CHỦ ĐỀ · {item.topic.name.toLocaleUpperCase("vi-VN")}</small><strong>{item.title}</strong><span>{item.isCompleted ? "Đã hoàn thành" : item.isLocked ? "Hoàn thành bài phía trước để mở khóa" : item.lessonId === pathData.recommendedLessonId ? pathData.recommendation : typeof item.assessmentAccuracy === "number" ? `${item.skillStatus} · ${item.assessmentSource} ${item.assessmentAccuracy}%` : "Bài học theo chương trình lớp bạn"}</span></span><span className="learning-step-arrow">{item.isLocked ? "🔒" : "→"}</span></Link>)}
+            <div className="learning-recommendation"><span>🧭</span><div><small>BÀI HỌC ĐƯỢC GỢI Ý</small><strong>{pathData.lessons.find((item) => item.lessonId === pathData.recommendedLessonId)?.title || (pathData.masteredCount ? "Em đã vững các nội dung đã kiểm tra" : "Bạn đã hoàn thành lộ trình!")}</strong><p>{pathData.recommendation}</p></div></div>
+            {pathData.lessons.map((item, index) => <Link key={item.lessonId} to={item.isLocked ? "/hoc-tap" : `/hoc-tap/${item.lessonId}`} aria-disabled={item.isLocked} onClick={(event) => { if (item.isLocked) event.preventDefault(); }} className={`learning-path-item ${String(item.lessonId) === lessonId ? "is-selected" : ""} ${item.isCompleted ? "is-completed" : ""} ${item.isMastered && !item.isCompleted ? "is-mastered" : ""} ${item.isLocked ? "is-locked" : ""}`}><span className="learning-step-number">{item.isCompleted ? "✓" : item.isMastered ? "⭐" : item.isLocked ? "🔒" : String(index + 1).padStart(2, "0")}</span><span className="learning-step-copy"><small>CHỦ ĐỀ · {item.topic.name.toLocaleUpperCase("vi-VN")}</small><strong>{item.title}</strong><span>{item.isCompleted ? "Đã hoàn thành" : item.isMastered ? "Đã vững theo bài đánh giá · có thể bỏ qua" : item.isLocked ? "Hoàn thành bài phía trước để mở khóa" : item.lessonId === pathData.recommendedLessonId ? pathData.recommendation : typeof item.assessmentAccuracy === "number" ? `${item.skillStatus} · ${item.assessmentSource} ${item.assessmentAccuracy}%` : "Bài học theo chương trình lớp bạn"}</span></span><span className="learning-step-arrow">{item.isLocked ? "🔒" : "→"}</span></Link>)}
           </section>
 
           </details>
           <section className="learning-lesson-card">
             {!lesson ? <div className="learning-empty"><StudyArt grade={pathData.grade} /><h2>{lessonId ? "Không tìm thấy bài học" : "Chọn một bài để bắt đầu"}</h2><p>{lessonId ? "Bài học này không thuộc lớp hiện tại hoặc đã được gỡ khỏi lộ trình." : "Cùng khám phá kiến thức, xem ví dụ rồi làm thử nhé."}</p>{lessonId && <Link to="/hoc-tap" className="learning-primary">Quay lại lộ trình</Link>}</div> : lesson.isLocked ? <div className="learning-empty learning-locked-empty"><StudyIcon name="lock" size={48} /><h2>Bài học chưa được mở khóa</h2><p>Em hãy hoàn thành các bài học phía trước theo thứ tự. Khi hoàn thành bài hiện tại, bài tiếp theo sẽ tự động mở.</p><Link to="/hoc-tap" className="learning-primary">Quay lại danh sách bài</Link></div> : <>
-              <div className="learning-lesson-top"><span className="learning-lesson-icon"><StudyIcon name="book" /></span><span className="learning-kicker">Bài học · {lesson.topic.name}</span>{lesson.isCompleted && <span className="learning-done-chip">✓ Đã hoàn thành</span>}</div>
+              <div className="learning-lesson-top"><span className="learning-lesson-icon"><StudyIcon name="book" /></span><span className="learning-kicker">Bài học · {lesson.topic.name}</span>{lesson.isCompleted && <span className="learning-done-chip">✓ Đã hoàn thành</span>}{lesson.isMastered && !lesson.isCompleted && <span className="learning-mastered-chip">⭐ Đã vững</span>}</div>
               <h2>{lesson.title}</h2>
+              {lesson.isMastered && !lesson.isCompleted && <p className="learning-mastered-note" role="note">Bài đánh giá đầu vào cho thấy em đã vững phần này. Bài học vẫn mở để em xem lại nếu muốn, nhưng em có thể bỏ qua và học tiếp phần cần luyện.</p>}
               <div className="learning-study-steps" aria-label="Các bước học bài"><span className="is-active"><StudyIcon name="book" />1. Cùng khám phá</span><span className={theoryRead ? "is-active" : ""}><StudyIcon name="shapes" />2. Xem ví dụ</span><span className={practice.length > 0 ? "is-active" : ""}><StudyIcon name="flag" />3. Em thử nhé</span></div>
-              <article className="learning-concept"><small>Cùng khám phá</small><h3>Hiểu bài từng chút một</h3><p className="learning-theory-introduction">{lesson.introduction}</p>{["addition", "subtraction", "multiplication", "division", "fractions", "fraction", "geometry", "measurement", "time"].includes(lesson.topic.code) && <MathPicture topic={lesson.topic.code} grade={pathData.grade} />}<TheoryDetails text={lesson.keyConcept} />{lesson.topic.code === "percentage" && <PercentageModel />}</article>
-              <article className="learning-example"><small>Xem ví dụ</small><h3>Cùng làm từng bước</h3><WorkedExampleDetails text={lesson.workedExample} /></article>
-              <section className="learning-understanding"><strong>💡 Cách học hiệu quả</strong><ol><li>Đọc chậm phần lý thuyết và tìm từ khóa quan trọng.</li><li>Che kết quả trong ví dụ, tự làm lại trên giấy.</li><li>Nói lại quy tắc bằng lời của mình trước khi luyện tập.</li></ol><button className="learning-understood" onClick={() => setTheoryRead(true)}>{theoryRead ? "✓ Em đã hiểu phần bài học" : "✓ Em đã đọc và hiểu lý thuyết"}</button></section>
+              <article className={`learning-concept ${pathData.grade <= 2 ? "learning-concept-for-early-readers" : ""}`}><small>{pathData.grade <= 2 ? "NHÌN HÌNH, HIỂU NGAY" : "Cùng khám phá"}</small><h3>{pathData.grade <= 2 ? "Mình cùng học nhé!" : "Hiểu bài từng chút một"}</h3>{pathData.grade <= 2 ? <YoungLearnerTheory introduction={lesson.introduction} keyConcept={lesson.keyConcept} topic={lesson.topic.code} title={lesson.title} grade={pathData.grade} /> : <><p className="learning-theory-introduction">{lesson.introduction}</p>{["addition", "subtraction", "multiplication", "division", "fractions", "fraction", "geometry", "measurement", "time"].includes(lesson.topic.code) && <MathPicture topic={lesson.topic.code} grade={pathData.grade} />}<TheoryDetails text={lesson.keyConcept} />{lesson.topic.code === "percentage" && <PercentageModel />}</>}</article>
+              <article className={`learning-example ${pathData.grade <= 2 ? "learning-example-for-early-readers" : ""}`}><small>{pathData.grade <= 2 ? "VÍ DỤ BẰNG HÌNH VÀ CÁC BƯỚC NGẮN" : "Xem ví dụ"}</small><h3>Cùng làm từng bước</h3>{pathData.grade <= 2 ? <YoungLearnerExample text={lesson.workedExample} /> : <WorkedExampleDetails text={lesson.workedExample} />}</article>
+              <LessonGuide grade={pathData.grade} topic={lesson.topic.code} />
+              <section className={`learning-understanding ${pathData.grade <= 2 ? "learning-understanding-for-early-readers" : ""}`}><strong>💡 {pathData.grade <= 2 ? "Học theo cách vui vẻ" : "Cách học hiệu quả"}</strong><ol>{pathData.grade <= 2 ? <><li>Nhìn hình và nói to điều em nhận ra.</li><li>Dùng đồ vật quanh em để thử làm lại.</li></> : <><li>Đọc chậm phần lý thuyết và tìm từ khóa quan trọng.</li><li>Che kết quả trong ví dụ, tự làm lại trên giấy.</li><li>Nói lại quy tắc bằng lời của mình trước khi luyện tập.</li></>}</ol><button className="learning-understood" onClick={() => setTheoryRead(true)}>{theoryRead ? "✓ Em đã hiểu phần bài học" : pathData.grade <= 2 ? "✓ Em đã xem hình và hiểu bài" : "✓ Em đã đọc và hiểu lý thuyết"}</button></section>
               <section className={`learning-practice ${!theoryRead ? "is-locked" : ""}`}><div className="learning-practice-heading"><span><StudyIcon name="flag" /></span><div><strong>Em thử nhé</strong><small>{!theoryRead ? "Cùng học và xem ví dụ ở trên trước nhé" : `3 câu luyện tập lớp ${pathData.grade} · mức ${ ["", "cơ bản", "trung bình", "nâng cao"][lesson.recommendedDifficulty || pathData.recommendedDifficulty || 1] }`}</small></div></div>
                 {!theoryRead ? <div className="learning-practice-locked">🔒 Phần luyện tập sẽ mở sau khi em hoàn thành phần học ở trên.</div> : practice.length === 0 ? <button className="learning-primary" onClick={startPractice} disabled={practiceLoading}>{practiceLoading ? "Đang chuẩn bị bài luyện…" : "Bắt đầu tự luyện →"}</button> : practiceIndex >= practice.length ? <div className="learning-practice-finished" role="status"><strong>Hoàn thành phần tự luyện!</strong><span>Đúng {correctCount}/{practice.length} câu. Hãy xem lại lời giải rồi cập nhật tiến độ bài học.</span></div> : <>
                   <div className="learning-practice-progress">CÂU {practiceIndex + 1} / {practice.length}</div><p className="learning-practice-question">{currentQuestion.questionText}</p>
@@ -200,7 +233,7 @@ export default function LearningPath({ onLogout }) {
               </section>
               {practiceError && <p className="learning-alert learning-inline-alert" role="alert">{practiceError}</p>}
               {progressMessage && <p className="learning-progress-success" role="status">{progressMessage}</p>}
-              <div className="learning-lesson-actions"><Link to="/hoc-tap">← Danh sách bài</Link><div className="learning-complete-action"><button className="learning-primary" onClick={markComplete} disabled={savingProgress || lesson.isCompleted || !theoryRead || !practiceFinished}>{savingProgress ? "Đang lưu…" : lesson.isCompleted ? "Đã hoàn thành ✓" : "Đánh dấu đã học xong ✓"}</button>{!lesson.isCompleted && (!theoryRead || !practiceFinished) && <small>Đọc lý thuyết và hoàn thành 3 câu tự luyện để mở nút này.</small>}</div></div>
+              <div className="learning-lesson-actions"><Link to="/hoc-tap">← Danh sách bài</Link>{lesson.isMastered && !lesson.isCompleted ? <Link to="/hoc-tap" className="learning-primary learning-skip-mastered">Bỏ qua bài đã vững →</Link> : <div className="learning-complete-action"><button className="learning-primary" onClick={markComplete} disabled={savingProgress || lesson.isCompleted || !theoryRead || !practiceFinished}>{savingProgress ? "Đang lưu…" : lesson.isCompleted ? "Đã hoàn thành ✓" : "Đánh dấu đã học xong ✓"}</button>{!lesson.isCompleted && (!theoryRead || !practiceFinished) && <small>Đọc lý thuyết và hoàn thành 3 câu tự luyện để mở nút này.</small>}</div>}</div>
             </>}
           </section>
         </div>

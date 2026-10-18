@@ -119,8 +119,16 @@ export async function registerUser({
     name,
     email,
     password,
-    role = "Student"
+    role = "Student",
+    grade = 1
 }) {
+    const studentGrade = Number(grade);
+    if (role === "Student" && (!Number.isInteger(studentGrade) || studentGrade < 1 || studentGrade > 5)) {
+        const error = new Error("Vui lòng chọn lớp hiện tại từ lớp 1 đến lớp 5.");
+        error.status = 400;
+        throw error;
+    }
+
     const pool = await getPool();
 
     // Hash password
@@ -215,6 +223,12 @@ export async function registerUser({
                     user.UserId
                 )
 
+                .input(
+                    "grade",
+                    sql.TinyInt,
+                    studentGrade
+                )
+
                 .query(`
                     INSERT INTO [mk].[Student]
                     (
@@ -225,7 +239,7 @@ export async function registerUser({
                     VALUES
                     (
                         @studentId,
-                        1
+                        @grade
                     )
                 `);
         }
@@ -358,7 +372,7 @@ export async function loginUser({
     };
 }
 
-export async function loginWithGoogle(credential, requestedRole) {
+export async function loginWithGoogle(credential, requestedRole, requestedGrade) {
     if (!/^\d+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(String(process.env.GOOGLE_CLIENT_ID || "").trim())) {
         const error = new Error("Google login chưa được cấu hình đúng trên máy chủ: cần Client ID kết thúc bằng .apps.googleusercontent.com.");
         error.status = 503;
@@ -371,6 +385,12 @@ export async function loginWithGoogle(credential, requestedRole) {
     }
     if (requestedRole !== undefined && !["Student", "Parent"].includes(requestedRole)) {
         const error = new Error("Vai trò đăng ký không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    const studentGrade = requestedRole === "Student" ? Number(requestedGrade) : 1;
+    if (requestedRole === "Student" && (!Number.isInteger(studentGrade) || studentGrade < 1 || studentGrade > 5)) {
+        const error = new Error("Vui lòng chọn lớp hiện tại từ lớp 1 đến lớp 5.");
         error.status = 400;
         throw error;
     }
@@ -452,6 +472,11 @@ async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, 
         throw error;
     }
     if (!user) {
+        if (!requestedRole) {
+            const error = new Error("Chưa có tài khoản này. Hãy chọn Đăng ký để tạo tài khoản và chọn lớp học.");
+            error.status = 404;
+            throw error;
+        }
         const userRole = requestedRole || "Student";
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
@@ -464,7 +489,7 @@ async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, 
                 .query("INSERT INTO [mk].[AppUser] (Email, PasswordHash, DisplayName, UserRole) OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.DisplayName, INSERTED.UserRole VALUES (@email, @passwordHash, @displayName, @userRole)");
             user = created.recordset[0];
             if (userRole === "Student") {
-                await transaction.request().input("studentId", sql.Int, user.UserId).query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, 1)");
+                await transaction.request().input("studentId", sql.Int, user.UserId).input("grade", sql.TinyInt, studentGrade).query("INSERT INTO [mk].[Student] (StudentId, Grade) VALUES (@studentId, @grade)");
             }
             await transaction.commit();
         } catch (error) {

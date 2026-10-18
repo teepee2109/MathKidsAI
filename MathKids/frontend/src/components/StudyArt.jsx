@@ -58,6 +58,71 @@ export function MathPicture({ grade = 1, topic, className = "", caption = true }
   return <figure className={`math-picture ${className}`}><svg viewBox="0 0 360 250" role="img" aria-label={label}>{drawing}</svg>{caption && <figcaption>Ví dụ bằng hình</figcaption>}</figure>;
 }
 
+const elementaryVisuals = {
+  addition: { title: "Gộp lại", equation: "3 + 2 = 5", groups: [{ label: "Có 3 quả", icons: ["🍎", "🍎", "🍎"] }, { label: "Thêm 2 quả", operator: "+", icons: ["🍎", "🍎"] }, { label: "Tất cả 5 quả", icons: ["🍎", "🍎", "🍎", "🍎", "🍎"] }] },
+  subtraction: { title: "Lấy bớt", equation: "5 − 2 = 3", groups: [{ label: "Có 5 quả", icons: ["🍐", "🍐", "🍐", "🍐", "🍐"], crossed: 2 }, { label: "Còn lại", icons: ["🍐", "🍐", "🍐"] }] },
+  multiplication: { title: "Các nhóm bằng nhau", equation: "3 nhóm × 2 quả = 6", groups: [{ label: "Nhóm 1", icons: ["🍊", "🍊"], boxed: true }, { label: "Nhóm 2", icons: ["🍊", "🍊"], boxed: true }, { label: "Nhóm 3", icons: ["🍊", "🍊"], boxed: true }] },
+  division: { title: "Chia đều", equation: "6 quả chia 3 bạn = mỗi bạn 2 quả", groups: [{ label: "Bạn 1", icons: ["🍓", "🍓"], boxed: true }, { label: "Bạn 2", icons: ["🍓", "🍓"], boxed: true }, { label: "Bạn 3", icons: ["🍓", "🍓"], boxed: true }] },
+  "place-value": { title: "Tách số thành các hàng", type: "place-value" },
+  geometry: { title: "Nhận biết hình", type: "shapes" },
+  measurement: { title: "Đo độ dài", type: "ruler" },
+  time: { title: "Xem giờ trên đồng hồ", type: "clock" },
+  "word-problems": { title: "Đọc chuyện bằng hình", equation: "3 túi, mỗi túi 2 quả → 6 quả", groups: [{ label: "Túi 1", icons: ["🍬", "🍬"], boxed: true }, { label: "Túi 2", icons: ["🍬", "🍬"], boxed: true }, { label: "Túi 3", icons: ["🍬", "🍬"], boxed: true }] },
+  statistics: { title: "So sánh số lượng", type: "chart" },
+};
+
+function PlaceValuePicture({ grade }) {
+  const isGradeTwo = Number(grade) === 2;
+  const columns = isGradeTwo
+    ? [{ name: "Trăm", count: 3, type: "hundred" }, { name: "Chục", count: 2, type: "ten" }, { name: "Đơn vị", count: 6, type: "unit" }]
+    : [{ name: "Chục", count: 2, type: "ten" }, { name: "Đơn vị", count: 4, type: "unit" }];
+  return <div className="elementary-place-value" aria-label={isGradeTwo ? "326 gồm 3 trăm, 2 chục và 6 đơn vị" : "24 gồm 2 chục và 4 đơn vị"}>
+    {columns.map((column) => <div className="elementary-place-column" key={column.name}><strong>{column.name}</strong><div className="elementary-place-pieces">{Array.from({ length: column.count }, (_, index) => <span className={`is-${column.type}`} key={index}>{column.type === "unit" ? "●" : column.type === "hundred" ? "▦" : "▥"}</span>)}</div><small>{column.count} {column.name.toLocaleLowerCase("vi-VN")}</small></div>)}
+    <b className="elementary-place-total">= {isGradeTwo ? "326" : "24"}</b>
+  </div>;
+}
+
+function ElementaryVisualScene({ visual, grade }) {
+  if (visual.type === "place-value") return <PlaceValuePicture grade={grade} />;
+  if (visual.type === "shapes") return <div className="elementary-shape-row" aria-label="Hình tròn, hình tam giác, hình vuông và hình chữ nhật">{[["circle", "Hình tròn", "⚽"], ["triangle", "Tam giác", "🍕"], ["square", "Hình vuông", "🪟"], ["rectangle", "Chữ nhật", "📖"]].map(([shape, label, icon]) => <div className="elementary-shape-card" key={shape}><span className={`elementary-shape elementary-shape-${shape}`} aria-hidden="true">{icon}</span><small>{label}</small></div>)}</div>;
+  if (visual.type === "ruler") return <div className="elementary-ruler-scene" aria-label="Thước có vạch số từ 0 đến 5 xăng-ti-mét"><span className="elementary-ruler-object">✏️</span><div className="elementary-ruler">{Array.from({ length: 6 }, (_, index) => <span key={index}><i />{index}</span>)}</div><strong>Đặt đầu bút ở số 0, rồi đọc số ở đầu kia.</strong></div>;
+  if (visual.type === "clock") return <div className="elementary-clock-scene"><div className="elementary-clock" role="img" aria-label="Đồng hồ chỉ 4 giờ đúng">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ "--clock-index": index }} />)}<span className="elementary-clock-hour" /><span className="elementary-clock-minute" /></div><div><strong>4 giờ đúng</strong><small>Kim dài ở số 12 · kim ngắn ở số 4</small></div></div>;
+  if (visual.type === "chart") return <div className="elementary-chart-scene" aria-label="Biểu đồ tranh so sánh số lượng táo và chuối"><div><span>🍎</span><b>{"🍎🍎🍎🍎"}</b><small>4 quả táo</small></div><div><span>🍌</span><b>{"🍌🍌"}</b><small>2 quả chuối</small></div><strong>Táo nhiều hơn!</strong></div>;
+  return <div className={`elementary-object-groups ${visual.groups.length > 2 ? "has-many-groups" : ""}`}>
+    {visual.groups.map((group, index) => <div className="elementary-object-group" key={`${group.label}-${index}`}>
+      {group.operator && <b className="elementary-object-operator">{group.operator}</b>}
+      <div className={`elementary-object-basket ${group.boxed ? "is-boxed" : ""}`}>
+        <div className="elementary-object-icons">{group.icons.map((icon, itemIndex) => <span className={group.crossed > itemIndex ? "is-crossed" : ""} key={`${icon}-${itemIndex}`} aria-hidden="true">{icon}</span>)}</div>
+        <small>{group.label}</small>
+      </div>
+      {index < visual.groups.length - 1 && !visual.groups[index + 1].operator && visual.groups.length <= 2 && <b className="elementary-object-operator">→</b>}
+    </div>)}
+    {visual.equation && <strong className="elementary-visual-equation">{visual.equation}</strong>}
+  </div>;
+}
+
+/** Picture-first lesson support designed for early readers in grades 1–2. */
+export function ElementaryLessonVisual({ topic, title = "", grade = 1 }) {
+  const normalizedTopic = String(topic || "").toLocaleLowerCase("vi-VN");
+  const normalizedTitle = String(title).toLocaleLowerCase("vi-VN");
+  const knownTopic = Object.keys(elementaryVisuals).find((code) => normalizedTopic === code || normalizedTopic.includes(code));
+  const inferredTopic = knownTopic || (normalizedTitle.includes("trừ") ? "subtraction"
+    : normalizedTitle.includes("cộng") ? "addition"
+      : normalizedTitle.includes("nhân") ? "multiplication"
+        : normalizedTitle.includes("chia") ? "division"
+          : normalizedTitle.includes("giá trị hàng") || normalizedTitle.includes("chục") || normalizedTitle.includes("đơn vị") ? "place-value"
+            : normalizedTitle.includes("hình") ? "geometry"
+              : normalizedTitle.includes("đo") ? "measurement"
+                : normalizedTitle.includes("giờ") || normalizedTitle.includes("thời gian") ? "time"
+                  : normalizedTitle.includes("lời văn") ? "word-problems"
+                    : normalizedTitle.includes("thống kê") ? "statistics" : "addition");
+  const visual = elementaryVisuals[inferredTopic] || elementaryVisuals.addition;
+  return <figure className={`elementary-lesson-visual is-${inferredTopic}`} aria-label={`${visual.title}${visual.equation ? `: ${visual.equation}` : ""}`}>
+    <figcaption><span aria-hidden="true">🖍️</span> {visual.title}</figcaption>
+    <ElementaryVisualScene visual={visual} grade={grade} />
+  </figure>;
+}
+
 export default function StudyArt({ grade = 1, className = "" }) {
   return <div className={`study-art study-art-grade-${grade} ${className}`}>{grade <= 2 ? <BunnyArt /> : <MathPicture grade={grade} caption={false} />}</div>;
 }

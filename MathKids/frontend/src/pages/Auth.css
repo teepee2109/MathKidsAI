@@ -38,3 +38,7 @@
 .role-option.active { border-color: #6366f1; background: #eef2ff; color: #6366f1; }
 .role-option:hover:not(.active) { border-color: #c7d2fe; color: #4f46e5; }
 .form-success { margin: -2px 0 14px; color: #21845a; font-size: 12px; font-weight: 700; }
+.grade-field { margin-top: 16px; }
+.grade-select { width: 100%; height: 46px; margin-top: 7px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: #fbfcfe; font: 700 13px 'Nunito'; }
+.grade-select:focus { border-color: #9f8ef0; background: #fff; box-shadow: 0 0 0 3px #8f7bf01c; }
+.grade-select[aria-invalid="true"] { border-color: #e27b89; background: #fff8f9; }

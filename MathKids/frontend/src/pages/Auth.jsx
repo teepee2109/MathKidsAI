@@ -36,6 +36,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
     const [mode, setMode] = useState(initialMode);
     const [registerRole, setRegisterRole] = useState("Student");
+    const [registerGrade, setRegisterGrade] = useState("");
     const [values, setValues] = useState(initialValues);
     const [showPassword, setShowPassword] = useState(false);
     const [remember, setRemember] = useState(true);
@@ -47,6 +48,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const [otp, setOtp] = useState("");
     const [otpSent, setOtpSent] = useState(false);
     const [otpMessage, setOtpMessage] = useState("");
+    const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [googleReady, setGoogleReady] = useState(false);
@@ -54,6 +56,12 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     // Email/password handled by Firebase instead of the app's own email + OTP flow.
     const [firebaseEmail, setFirebaseEmail] = useState(false);
     const [firebaseVerificationPending, setFirebaseVerificationPending] = useState(false);
+
+    useEffect(() => {
+        if (otpCooldownSeconds <= 0) return undefined;
+        const timer = window.setTimeout(() => setOtpCooldownSeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+        return () => window.clearTimeout(timer);
+    }, [otpCooldownSeconds]);
 
     const isRegister = mode === "register";
 
@@ -127,6 +135,10 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     }
 
     const handleGoogleCredential = useCallback(async (credential) => {
+        if (mode === "register" && registerRole === "Student" && !/^[1-5]$/.test(registerGrade)) {
+            setError("Vui lòng chọn lớp hiện tại của học sinh trước khi đăng ký.");
+            return;
+        }
         setIsSubmitting(true);
         setError("");
         try {
@@ -136,6 +148,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 body: JSON.stringify({
                     credential,
                     ...(mode === "register" ? { role: registerRole } : {}),
+                    ...(mode === "register" && registerRole === "Student" ? { grade: Number(registerGrade) } : {}),
                 }),
             });
             const data = await response.json().catch(() => ({}));
@@ -149,7 +162,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         } finally {
             setIsSubmitting(false);
         }
-    }, [mode, navigate, onAuthenticated, registerRole]);
+    }, [mode, navigate, onAuthenticated, registerGrade, registerRole]);
 
     useEffect(() => {
         if (!googleClientId) return undefined;
@@ -204,6 +217,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
         setOtpSent(false);
         setOtpMessage("");
         setFirebaseVerificationPending(false);
+        setOtpCooldownSeconds(0);
+
     }
 
     function handleChange(event) {
@@ -278,6 +293,10 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 "Mật khẩu xác nhận chưa khớp.";
         }
 
+        if (isRegister && registerRole === "Student" && !/^[1-5]$/.test(registerGrade)) {
+            nextErrors.grade = "Vui lòng chọn lớp hiện tại của học sinh.";
+        }
+
         if (isRegister && otpSent && !/^\d{6}$/.test(otp)) nextErrors.otp = "Mã OTP phải gồm 6 chữ số.";
         if (forgotPassword && otpSent) {
             if (!/^\d{6}$/.test(otp)) nextErrors.otp = "Mã OTP phải gồm 6 chữ số.";
@@ -320,7 +339,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể xử lý yêu cầu đặt lại mật khẩu.");
                 if (!isConfirmingReset) {
                     setOtpSent(true);
-                    setOtpMessage(data.message || "Nếu email đã đăng ký, mã OTP sẽ được gửi đến hộp thư.");
+                    setOtpMessage(data.message || "Nếu email thuộc tài khoản đang hoạt động, OTP sẽ được gửi nếu yêu cầu chưa chạm giới hạn. Nếu vừa yêu cầu mã, hãy chờ 60 giây rồi thử lại.");
+                    setOtpCooldownSeconds(60);
                 } else {
                     setForgotPassword(false);
                     setOtpSent(false);
@@ -339,6 +359,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 password: values.password,
                 confirmPassword: values.confirmPassword,
                 role: registerRole,
+                ...(registerRole === "Student" ? { grade: Number(registerGrade) } : {}),
             };
             if (isRegister && !otpSent) {
                 const response = await fetch(`${apiBase}/auth/register/request-otp`, {
@@ -350,6 +371,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                 if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể gửi mã OTP.");
                 setOtpSent(true);
                 setOtpMessage(data.message || "Mã xác minh đã được gửi đến email của bạn.");
+                setOtpCooldownSeconds(60);
                 return;
             }
 
@@ -399,7 +421,9 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             console.error("Auth error:", error);
 
             setError(
-                getFirebaseAuthErrorMessage(error, "Không thể kết nối tới máy chủ.")
+                error instanceof TypeError && (forgotPassword || (isRegister && !otpSent))
+                    ? "Kết nối với backend bị ngắt. Yêu cầu OTP có thể đã được xử lý; hãy kiểm tra email và Spam trước, rồi chờ 60 giây trước khi gửi lại."
+                    : getFirebaseAuthErrorMessage(error, "Không thể kết nối tới máy chủ.")
             );
         } finally {
             setIsSubmitting(false);
@@ -424,18 +448,25 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                     password: values.password,
                     confirmPassword: values.confirmPassword,
                     role: registerRole,
+                    ...(registerRole === "Student" ? { grade: Number(registerGrade) } : {}),
                 }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error([data.message, data.detail].filter(Boolean).join(" — ") || "Không thể gửi lại mã OTP.");
             setOtpMessage(data.message || "Mã xác minh mới đã được gửi.");
             setOtp("");
+            setOtpCooldownSeconds(60);
         } catch (requestError) {
-            setError(requestError.message || "Không thể gửi lại mã OTP.");
+            setError(requestError instanceof TypeError
+                ? "Kết nối với backend bị ngắt. Hãy kiểm tra email và Spam; nếu cần gửi lại, chờ 60 giây rồi thử tiếp."
+                : requestError.message || "Không thể gửi lại mã OTP.");
         } finally {
             setIsSubmitting(false);
         }
     }
+
+    const otpCooldownLabel = `${String(Math.floor(otpCooldownSeconds / 60)).padStart(2, "0")}:${String(otpCooldownSeconds % 60).padStart(2, "0")}`;
+    const otpRequestBlocked = !firebaseEmail && otpCooldownSeconds > 0 && (forgotPassword || isRegister) && !otpSent;
 
     return (
         <main className="auth-shell">
@@ -630,19 +661,43 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                     <button
                                         type="button"
                                         className={`role-option ${registerRole === "Student" ? "active" : ""}`}
-                                        onClick={() => { setRegisterRole("Student"); setOtpSent(false); setOtp(""); setOtpMessage(""); }}
+                                        onClick={() => { setRegisterRole("Student"); setOtpSent(false); setOtp(""); setOtpMessage(""); setErrors((current) => ({ ...current, grade: "" })); setError(""); }}
                                     >
                                         🎒 Học sinh
                                     </button>
                                     <button
                                         type="button"
                                         className={`role-option ${registerRole === "Parent" ? "active" : ""}`}
-                                        onClick={() => { setRegisterRole("Parent"); setOtpSent(false); setOtp(""); setOtpMessage(""); }}
+                                        onClick={() => { setRegisterRole("Parent"); setOtpSent(false); setOtp(""); setOtpMessage(""); setErrors((current) => ({ ...current, grade: "" })); setError(""); }}
                                     >
                                         👨‍👩‍👧 Phụ huynh
                                     </button>
                                 </div>
                             </div>
+                        )}
+
+                        {isRegister && registerRole === "Student" && (
+                            <label className="field grade-field">
+                                <span>Lớp hiện tại của học sinh</span>
+                                <select
+                                    className="grade-select"
+                                    name="grade"
+                                    value={registerGrade}
+                                    onChange={(event) => {
+                                        setRegisterGrade(event.target.value);
+                                        setErrors((current) => ({ ...current, grade: "" }));
+                                        setError("");
+                                    }}
+                                    required
+                                    aria-invalid={Boolean(errors.grade)}
+                                >
+                                    <option value="">Chọn lớp</option>
+                                    {[1, 2, 3, 4, 5].map((grade) => (
+                                        <option value={grade} key={grade}>Lớp {grade}</option>
+                                    ))}
+                                </select>
+                                {errors.grade && <small className="field-error">{errors.grade}</small>}
+                            </label>
                         )}
 
                         {/* EMAIL */}
@@ -807,8 +862,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                                 </span>
                                 {errors.otp && <small className="field-error">{errors.otp}</small>}
                                 <small>{otpMessage} Nếu chưa thấy email, hãy kiểm tra thư mục spam.</small>
-                                <button type="button" className="link-button" onClick={resendOtp} disabled={isSubmitting}>
-                                    Gửi lại mã OTP
+                                <button type="button" className="link-button" onClick={resendOtp} disabled={isSubmitting || otpCooldownSeconds > 0}>
+                                    {otpCooldownSeconds > 0 ? `Gửi lại mã sau ${otpCooldownLabel}` : "Gửi lại mã OTP"}
                                 </button>
                             </label>
                         )}
@@ -885,16 +940,16 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                         <button
                             className="submit-button"
                             type="submit"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || otpRequestBlocked}
                         >
                             {isSubmitting
                                 ? "Đang xử lý..."
                                 : firebaseEmail
                                     ? forgotPassword ? "Gửi liên kết đặt lại" : isRegister ? firebaseVerificationPending ? "Tôi đã xác minh email" : "Tạo tài khoản" : "Đăng nhập"
                                 : forgotPassword
-                                    ? otpSent ? "Đổi mật khẩu" : "Gửi mã OTP"
+                                    ? otpSent ? "Đổi mật khẩu" : otpCooldownSeconds > 0 ? `Gửi lại sau ${otpCooldownLabel}` : "Gửi mã OTP"
                                     : isRegister
-                                        ? otpSent ? "Xác minh & tạo tài khoản" : "Gửi mã OTP"
+                                        ? otpSent ? "Xác minh & tạo tài khoản" : otpCooldownSeconds > 0 ? `Gửi lại sau ${otpCooldownLabel}` : "Gửi mã OTP"
                                         : "Đăng nhập"}
 
                             <span>→</span>

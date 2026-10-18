@@ -18,9 +18,9 @@ const games = [
 ];
 
 const gameThemes = {
-  space: { icon: "🚀", name: "Vũ trụ", character: "👩‍🚀", title: "Nhiệm vụ chinh phục các vì sao", description: "Mỗi phép tính là một nhiệm vụ. Giải đúng để đưa phi hành gia tới hành tinh tiếp theo.", action: "Bắt đầu nhiệm vụ", fit: "Cộng · Trừ · Nhân · Chia" },
-  ocean: { icon: "🌊", name: "Đại dương", character: "🐳", title: "Khám phá đại dương toán học", description: "Lặn qua những bong bóng câu hỏi và giúp cá voi tìm đường về rạn san hô.", action: "Khám phá đại dương", fit: "Tính nhanh · Bài toán ngắn" },
-  forest: { icon: "🌳", name: "Khu rừng kỳ thú", character: "🐿️", title: "Cuộc phiêu lưu trong khu rừng", description: "Theo dấu các con vật, giải nhiệm vụ logic và mở những bí mật hình học.", action: "Khám phá khu rừng", fit: "Toán đố · Logic · Hình học" },
+  space: { icon: "🚀", name: "Vũ trụ", character: "👩‍🚀", title: "Nhiệm vụ chinh phục các vì sao", description: "Tự điều khiển phi thuyền, tính giá trị pin năng lượng theo lớp và gom vừa đủ nhiên liệu qua ba vùng sao.", action: "Bắt đầu nhiệm vụ", fit: "Cộng trừ · Nhân · Phân số · Số thập phân" },
+  ocean: { icon: "🌊", name: "Đại dương", character: "🐳", title: "Khám phá đại dương toán học", description: "Lái cá voi, nhẩm giá trị từng viên ngọc để đủ tổng mở rương và né đá biển.", action: "Khám phá đại dương", fit: "Tính nhẩm · Phân số · Số thập phân · Phản xạ" },
+  forest: { icon: "🌳", name: "Khu rừng kỳ thú", character: "🐿️", title: "Cuộc phiêu lưu trong khu rừng", description: "Tự tay khám phá khu rừng, xây hình và tìm lối đi qua các chướng ngại vật.", action: "Khám phá khu rừng", fit: "Toán hình · Không gian · Khám phá" },
 };
 
 const currentTime = () => Date.now();
@@ -39,15 +39,17 @@ function GamePicker() {
     localStorage.setItem("mathkids-game-theme", nextTheme);
   }
   const arcadeGames = [
-    { mode: "memory", icon: "🃏", color: "game-purple", tag: "TRÍ NHỚ", title: "Lật thẻ tìm cặp", type: "Ghi nhớ · Ghép nhanh", description: "Lật các thẻ, ghi nhớ phép tính và ghép với kết quả tương ứng." },
-    { mode: "garden", icon: "🌻", color: "game-green", tag: "GHÉP SỐ", title: "Khu vườn tổng số", type: "Chọn chiến lược · Tạo tổng", description: "Chọn hai quả táo có tổng bằng mục tiêu để gieo trồng từng luống." },
-    { mode: "balance", icon: "⚖️", color: "game-orange", tag: "TƯ DUY CHIẾN LƯỢC", title: "Tháp cân bằng", type: "Phân loại · Cân bằng", description: "Phân các khối số vào hai bệ để tìm cách chia có tổng bằng nhau." },
-    { mode: "maze", icon: "🤖", color: "game-blue", tag: "ĐIỀU KHIỂN ROBOT", title: "Mê cung tổng số", type: "Di chuyển · Tìm đường", description: "Điều khiển robot gom số đúng mục tiêu rồi tìm đường tới cửa ra." },
-    { mode: "formula", icon: "🧩", color: "game-purple", tag: "CÔNG THỨC", title: "Lắp ráp công thức", type: "Tính toán · Hoàn thiện", description: "Tính phần còn thiếu để hoàn thiện phép tính theo lớp." },
-    { mode: "word", icon: "🔎", color: "game-orange", tag: "TOÁN ĐỐ", title: "Giải mã bài toán", type: "Đọc hiểu · Lập phép tính", description: "Đọc tình huống, chọn phép tính phù hợp rồi nhập lời giải." },
-    { mode: "geometry", icon: "📐", color: "game-blue", tag: "TOÁN HÌNH", title: "Xây hình đúng yêu cầu", type: "Tạo hình · Diện tích · Chu vi", description: "Điều chỉnh hình chữ nhật để đạt diện tích hoặc chu vi mục tiêu." },
+    { mode: "balance", icon: "⚖️", color: "game-orange", tag: "TƯƠNG TÁC", title: "Tháp cân bằng", type: "Kéo thả · Cân bằng", description: "Tự tay chuyển các khối số sang hai bên để chiếc cân thăng bằng." },
+    { mode: "maze", icon: "🤖", color: "game-blue", tag: "ĐIỀU KHIỂN", title: "Mê cung tổng số", type: "Di chuyển · Tìm đường", description: "Dùng phím hoặc nút điều khiển để lái robot qua mê cung và gom số." },
+    { mode: "geometry", icon: "📐", color: "game-blue", tag: "TẠO HÌNH", title: "Xây hình đúng yêu cầu", type: "Điều chỉnh · Khám phá hình", description: "Tự thay đổi chiều dài và chiều cao để xây hình theo ý mình." },
+    { mode: "crossmath", icon: "🔢", color: "game-orange", tag: "Ô CHỮ TOÁN HỌC", title: "Ô chữ tổng hàng – cột", type: "Kéo thả · Ghép giao điểm", description: "Sắp xếp các ô số sao cho mọi tổng theo hàng và cột cùng chính xác." },
+    { mode: "rectangles", icon: "🧱", color: "game-green", tag: "VẼ VÀ TÍNH", title: "Vẽ hình đúng diện tích", type: "Tạo hình · Đếm ô vuông", description: "Tự vẽ hình chữ nhật trên lưới để tạo diện tích yêu cầu theo lớp." },
+    { mode: "drag-race", icon: "🏎️", color: "game-purple", tag: "ĐUA XE TOÁN HỌC", title: "Đua xe thần tốc", type: "Tính nhẩm · Tăng tốc", description: "Giải phép tính theo lớp để tăng tốc, vượt bạn thỏ và chinh phục ba chặng đua." },
+    { mode: "rocket", icon: "🚀", color: "game-purple", tag: "TOÁN + ĐIỀU KHIỂN 2D", title: "Phi thuyền nạp nhiên liệu", type: "Lái tàu · Tính tổng vừa đủ", description: "Mỗi viên pin hiện một số hoặc phép tính theo lớp. Nhẩm tổng nhiên liệu trước khi lái tàu tới nhặt." },
+    { mode: "ocean", icon: "🐳", color: "game-blue", tag: "TOÁN + ĐIỀU KHIỂN 2D", title: "Cá voi hứng ngọc toán học", type: "Bơi tránh đá · Cộng giá trị ngọc", description: "Ngọc mang số hoặc phép tính theo lớp. Điều khiển cá voi, tính tổng để mở rương mà không vượt mức." },
+    { mode: "memory", icon: "🃏", color: "game-orange", tag: "LẬT THẺ · GHÉP CẶP", title: "Thám tử lật thẻ toán", type: "Ghi nhớ · Ghép phép tính với kết quả", description: "Lật từng thẻ, ghi nhớ vị trí và ghép phép tính với đáp án đúng theo kiến thức lớp em." },
   ];
-  return <main className={`math-games-page game-theme-${theme}`} data-grade={grade}><GameHeader /><section className="games-content"><div className="games-intro"><span>🎲 KHU VUI HỌC TOÁN</span><h1>Chọn thế giới để bắt đầu!</h1><p>Chọn một trò chơi, cùng vui với những con số nhé.</p></div><div className="game-theme-picker" aria-label="Chọn chủ đề giao diện">{Object.entries(gameThemes).map(([key, item]) => <button key={key} className={theme === key ? "is-active" : ""} onClick={() => chooseTheme(key)}>{item.icon} {item.name}</button>)}</div><section className="game-theme-hero"><div className="game-theme-hero-copy"><span className="game-theme-kicker">{activeTheme.icon} CHỦ ĐỀ ĐANG CHỌN · LỚP {grade}</span><h2>{activeTheme.title}</h2><p>{activeTheme.description}</p><span className="game-theme-fit">Phù hợp: {activeTheme.fit}</span><a href="#interactive-games" className="game-theme-action">{activeTheme.action} <span>→</span></a></div><div className="game-theme-character"><StudyArt grade={grade} /></div><div className="game-theme-decoration" aria-hidden="true">{theme === "space" ? "✦  ·  🪐  ·  ✧" : theme === "ocean" ? "🫧  🐠  🫧" : "🍃  🌼  🍃"}</div></section><h2 className="game-section-title" id="interactive-games">🎮 Trò chơi tương tác</h2><div className="grade-game-grid arcade-picker-grid">{arcadeGames.map((game) => <Link key={game.mode} to={`/tro-choi?mini=${game.mode}&grade=${grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">{game.tag}</span><h2>{game.title}</h2><strong>{game.type}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div><h2 className="game-section-title">📚 Thử thách theo lớp</h2><div className="grade-game-grid">{games.map((game) => <Link key={game.grade} to={`/tro-choi/${game.grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">LỚP {game.grade}</span><h2>{game.title}</h2><strong>{game.topic}</strong><p>{game.description}</p><span className="play-game">Luyện tập ngay <i>→</i></span></Link>)}</div></section></main>;
+  return <main className={`math-games-page game-theme-${theme}`} data-grade={grade}><GameHeader /><section className="games-content"><div className="games-intro"><span>🎮 KHU VUI HỌC TOÁN</span><h1>Chọn trò chơi để bắt đầu!</h1><p>Lái nhân vật, khám phá thế giới và chơi toán bằng chính đôi tay của em.</p></div><div className="game-theme-picker" aria-label="Chọn chủ đề giao diện">{Object.entries(gameThemes).map(([key, item]) => <button key={key} className={theme === key ? "is-active" : ""} onClick={() => chooseTheme(key)}>{item.icon} {item.name}</button>)}</div><section className="game-theme-hero"><div className="game-theme-hero-copy"><span className="game-theme-kicker">{activeTheme.icon} CHỦ ĐỀ ĐANG CHỌN · LỚP {grade}</span><h2>{activeTheme.title}</h2><p>{activeTheme.description}</p><span className="game-theme-fit">Phù hợp: {activeTheme.fit}</span><a href="#interactive-games" className="game-theme-action">{activeTheme.action} <span>→</span></a></div><div className="game-theme-character"><StudyArt grade={grade} /></div><div className="game-theme-decoration" aria-hidden="true">{theme === "space" ? "✦  ·  🪐  ·  ✧" : theme === "ocean" ? "🫧  🐠  🫧" : "🍃  🌼  🍃"}</div></section><h2 className="game-section-title" id="interactive-games">🕹️ Chơi và điều khiển</h2><div className="grade-game-grid arcade-picker-grid">{arcadeGames.map((game) => <Link key={game.mode} to={`/tro-choi?mini=${game.mode}&grade=${grade}`} className={`grade-game-card ${game.color}`}><span className="grade-game-icon">{game.icon}</span><span className="grade-chip">{game.tag}</span><h2>{game.title}</h2><strong>{game.type}</strong><p>{game.description}</p><span className="play-game">Chơi ngay <i>→</i></span></Link>)}</div></section></main>;
 }
 
 function PlayGame({ game }) {
@@ -189,9 +191,8 @@ export default function MathGames() {
   const { grade: rawGrade } = useParams();
   const [searchParams] = useSearchParams();
   const miniGame = searchParams.get("mini");
-  if (!rawGrade) return ["memory", "garden", "balance", "maze", "formula", "word", "geometry"].includes(miniGame) ? <ArcadeMathGames mode={miniGame} grade={searchParams.get("grade")} /> : <GamePicker />;
-  const grade = Number(rawGrade);
-  const game = games.find((item) => item.grade === grade);
-  if (!game) return <GamePicker />;
-  return <PlayGame key={grade} game={game} />;
+  if (!rawGrade && ["balance", "maze", "geometry", "crossmath", "rectangles", "drag-race", "rocket", "ocean", "memory"].includes(miniGame)) {
+    return <ArcadeMathGames mode={miniGame} grade={searchParams.get("grade")} />;
+  }
+  return <GamePicker />;
 }

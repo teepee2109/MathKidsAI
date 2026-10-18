@@ -1,0 +1,224 @@
+.crossmath-status,
+.rectangle-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 12px;
+  color: #66819e;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.crossmath-status span:first-child,
+.rectangle-status span { letter-spacing: .6px; }
+.rectangle-status strong { color: #2e6eaa; font-size: 12px; }
+.crossmath-grid {
+  display: grid;
+  grid-template-columns: minmax(62px, .75fr) repeat(3, minmax(54px, 1fr));
+  gap: 7px;
+  width: min(430px, 100%);
+  margin: 0 auto;
+  padding: 12px;
+  border: 1px solid #dfe9f4;
+  border-radius: 17px;
+  background: #f6f9fd;
+}
+.crossmath-target {
+  display: grid;
+  place-items: center;
+  min-height: 52px;
+  border-radius: 11px;
+  background: #eaf3ff;
+  color: #3a70a5;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+.row-target { padding: 4px; }
+.column-target { font-size: 10px; }
+.corner-target { background: #f1f5f9; color: #91a2b5; }
+.crossmath-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 58px;
+  border: 2px dashed #d1dfed;
+  border-radius: 12px;
+  background: #fff;
+  color: #2c5b8a;
+  font: 900 17px 'Baloo 2', cursive;
+  cursor: pointer;
+  transition: transform .15s, border-color .15s, background .15s;
+}
+.crossmath-cell:hover { border-color: #7eb3e8; background: #f3f9ff; }
+.crossmath-cell.has-tile { border-style: solid; border-color: #9bc7ed; background: linear-gradient(145deg, #fff, #edf6ff); }
+.crossmath-cell.drop-ready { border-color: #6ba6e3; background: #edf7ff; }
+.crossmath-cell > span { color: #a8b8c8; font-size: 22px; }
+.crossmath-sums {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px auto;
+}
+.crossmath-sums span { padding: 6px 9px; border-radius: 9px; background: #f1f5f9; color: #7a8fa7; font-size: 9px; font-weight: 800; }
+.crossmath-sums .sum-matched { background: #e9f9ef; color: #208451; }
+.crossmath-message,
+.rectangle-message { min-height: 22px; margin: 9px 0; color: #72859c; font-size: 11px; font-weight: 800; text-align: center; }
+.crossmath-tray {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed #c8d8e8;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+.crossmath-chip {
+  min-width: 45px;
+  min-height: 43px;
+  padding: 6px 9px;
+  border: 1px solid #bdd5eb;
+  border-radius: 11px;
+  background: #fff;
+  color: #346a9f;
+  font: 900 14px 'Nunito', sans-serif;
+  cursor: grab;
+  touch-action: manipulation;
+}
+.crossmath-chip:active { cursor: grabbing; }
+.crossmath-chip.selected-chip { border-color: #e8b24b; background: #fff6df; box-shadow: 0 0 0 3px #f1c96a35; transform: translateY(-2px); }
+.crossmath-hint { margin: 8px 0 0; color: #8a9aae; font-size: 10px; line-height: 1.5; text-align: center; }
+.rectangle-status strong { color: #35834f; }
+.rectangle-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  width: min(370px, 100%);
+  margin: 0 auto;
+  padding: 13px;
+  border: 1px solid #d8eadc;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #f5fff4, #f4fbff);
+}
+.rectangle-cell {
+  aspect-ratio: 1;
+  border: 1px solid #cfe1d4;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #fff, #f7fcf8);
+  cursor: crosshair;
+  transition: background .12s, border-color .12s, transform .12s;
+  touch-action: manipulation;
+}
+.rectangle-cell:hover { border-color: #80c591; background: #f1fff2; }
+.rectangle-cell.rectangle-preview { border-color: #74bf80; background: linear-gradient(145deg, #abedb1, #77d787); box-shadow: inset 0 0 0 1px #ffffff80; }
+.rectangle-cell.rectangle-anchor { border: 2px solid #328d4c; background: #5ab86c; }
+.rectangle-message { color: #65866d; }
+.rectangle-card .arcade-emoji { background: #eafaeb; }
+
+@media (max-width: 520px) {
+  .crossmath-grid { grid-template-columns: minmax(51px, .72fr) repeat(3, minmax(45px, 1fr)); gap: 5px; padding: 8px; }
+  .crossmath-target { min-height: 47px; font-size: 9px; }
+  .crossmath-cell { min-height: 49px; border-radius: 9px; font-size: 14px; }
+  .crossmath-sums span { padding: 5px 7px; font-size: 8px; }
+  .rectangle-grid { gap: 4px; padding: 9px; }
+  .crossmath-status, .rectangle-status { align-items: flex-start; flex-direction: column; }
+  .rectangle-status { gap: 3px; }
+}
+
+.game-learning-panel { margin-bottom: 13px; overflow: hidden; border: 1px solid #d8e6f5; border-radius: 18px; background: linear-gradient(135deg, #f3f9ff, #fbf8ff); box-shadow: 0 6px 18px #294e7410; }
+.game-learning-panel > summary { display: flex; align-items: center; gap: 11px; padding: 13px 16px; color: #31577f; cursor: pointer; list-style: none; }
+.game-learning-panel > summary::-webkit-details-marker { display: none; }
+.game-learning-panel > summary > span:first-child { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 12px; background: #e4f0ff; font-size: 19px; }
+.game-learning-panel > summary > span:nth-child(2) { display: grid; gap: 2px; }
+.game-learning-panel > summary small { color: #6b8db2; font-size: 8px; font-weight: 1000; letter-spacing: .7px; }
+.game-learning-panel > summary strong { color: #2c5684; font-size: 12px; }
+.game-learning-panel > summary > i { margin-left: auto; color: #6c8bb0; font-size: 18px; font-style: normal; transition: transform .2s; }
+.game-learning-panel[open] > summary > i { transform: rotate(180deg); }
+.game-learning-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 13px 13px; }
+.game-learning-content article { min-width: 0; padding: 11px 12px; border: 1px solid #e4edf6; border-radius: 12px; background: #fff; }
+.game-learning-content article > strong { color: #3d628a; font-size: 10px; }
+.game-learning-content article p { margin: 5px 0 0; color: #607992; font-size: 10px; line-height: 1.65; }
+.game-learning-content .game-learning-example { border-color: #f0e2bc; background: #fffdf7; }
+.game-learning-reminder { grid-column: 1 / -1; margin: 0; padding: 9px 11px; border-radius: 10px; background: #eef9f2; color: #4c7560; font-size: 10px; line-height: 1.6; }
+.game-learning-reminder b { color: #2e7b4c; }
+
+/* A real card flip: the equation and result live on opposite faces. */
+.memory-tile { min-width: 0; min-height: 100px; padding: 0; border: 0; background: transparent; perspective: 800px; }
+.memory-tile:hover { transform: translateY(-2px); }
+.memory-tile-inner { position: relative; display: block; min-height: 100px; transform-style: preserve-3d; transition: transform .42s cubic-bezier(.2,.75,.25,1); }
+.memory-tile.is-open .memory-tile-inner { transform: rotateY(180deg); }
+.memory-tile-back,.memory-tile-front { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px; overflow-wrap: anywhere; border: 1px solid #d6e5f4; border-radius: 15px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.memory-tile-back { background: linear-gradient(145deg, #dcedff, #eee8ff); color: #6b71c6; font-size: 28px; }
+.memory-tile-front { transform: rotateY(180deg); border-color: #86b8eb; background: #fff; color: #295887; font: 900 clamp(12px, 2.5vw, 18px) 'Baloo 2', cursive; }
+.memory-tile.is-matched .memory-tile-front { border-color: #83d6a8; background: #eafaf1; color: #218553; }
+.memory-tile:focus-visible { outline: 3px solid #5798e6; outline-offset: 3px; border-radius: 16px; }
+
+@media (max-width: 600px) {
+  .game-learning-content { grid-template-columns: 1fr; }
+  .game-learning-reminder { grid-column: auto; }
+  .game-learning-panel > summary { padding: 11px 12px; }
+  .game-learning-panel > summary strong { font-size: 11px; }
+  .memory-tile,.memory-tile-inner { min-height: 75px; }
+  .memory-tile-back,.memory-tile-front { border-radius: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-tile-inner { transition: none; }
+}
+
+.drag-race-card .arcade-emoji { background: #fff0dc; }
+.drag-race-status { display: flex; justify-content: space-between; gap: 9px; margin: 17px 0 11px; color: #68839e; font-size: 10px; font-weight: 900; }
+.drag-race-scene { position: relative; height: 275px; overflow: hidden; border: 2px solid #91d2f5; border-radius: 19px; background: linear-gradient(#a9e6ff 0 35%, #65b848 35% 100%); isolation: isolate; }
+.race-sky { position: absolute; inset: 4px 0 auto; height: 70px; color: #fff; font-size: 22px; opacity: .9; text-align: center; }
+.race-trees { position: absolute; z-index: 2; right: 0; left: 0; overflow: hidden; height: 30px; color: #277b43; font-size: 22px; letter-spacing: 8px; white-space: nowrap; }
+.race-trees-top { top: 29%; }
+.race-trees-bottom { bottom: 2%; }
+.race-road { position: absolute; top: 34%; right: 7%; bottom: 8%; left: 7%; overflow: hidden; border: 3px solid #9da5a3; border-bottom: 0; background: linear-gradient(180deg, #52595c, #343a3d); clip-path: polygon(31% 0,69% 0,100% 100%,0 100%); }
+.race-center-line { position: absolute; z-index: 1; top: 0; bottom: 0; left: 50%; border-left: 4px dashed #ffffff76; }
+.race-finish-line { position: absolute; z-index: 2; top: 4%; right: 37%; left: 37%; height: 11px; overflow: hidden; background: conic-gradient(#fff 25%,#222 0 50%,#fff 0 75%,#222 0) 0 0/16px 16px; color: transparent; }
+.race-lane { position: absolute; z-index: 3; top: 0; bottom: 0; width: 50%; }
+.race-player-lane { left: 0; }
+.race-rival-lane { right: 0; }
+.race-lane-label { position: absolute; bottom: 4%; left: 50%; padding: 3px 6px; border-radius: 6px; background: #ffffffd9; color: #3d6275; font-size: 8px; font-weight: 900; transform: translateX(-50%); }
+.race-car { position: absolute; left: 50%; z-index: 4; display: inline-block; font-size: clamp(27px, 5vw, 43px); line-height: 1; filter: drop-shadow(0 4px 3px #1118); transition: bottom .55s cubic-bezier(.2,.8,.3,1),transform .55s ease; }
+.race-player-car,.race-player-lane .race-lane-label { left: 72%; }
+.race-rival-car,.race-rival-lane .race-lane-label { left: 28%; }
+.race-player-car { animation: race-bounce .3s ease-in-out infinite alternate; }
+.race-rival-car { animation: race-bounce .38s ease-in-out infinite alternate-reverse; }
+.drag-race-progress { display: grid; gap: 5px; margin: 10px 0; color: #6f8498; font-size: 9px; font-weight: 800; }
+.race-progress-row { display: grid; grid-template-columns: 72px minmax(60px,1fr); align-items: center; gap: 8px; }
+.drag-race-progress b { color: #3879ba; }
+.race-progress-bar { height: 8px; overflow: hidden; border-radius: 8px; background: #edf2f7; }
+.race-progress-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#55c7ef,#3c83e6); transition: width .45s ease; }
+.rival-progress-bar i { background: linear-gradient(90deg,#ffc35e,#f27d65); }
+.drag-race-question-panel { margin-top: 14px; padding: 15px; border: 1px solid #dce9f5; border-radius: 16px; background: linear-gradient(145deg,#f7fbff,#eef6ff); }
+.race-question-count { color: #6a8bae; font-size: 9px; font-weight: 900; letter-spacing: .7px; text-align: center; }
+.drag-race-equation { margin: 5px 0 12px; color: #214f7e; font: 900 clamp(27px,6vw,40px) 'Baloo 2',cursive; text-align: center; }
+.drag-race-answers { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.drag-race-answers button { position: relative; min-height: 55px; border: 1px solid #2171d5; border-radius: 11px; background: linear-gradient(145deg,#378cf0,#1763cf); box-shadow: 0 4px 0 #1552a5; color: #fff; font: 900 22px 'Baloo 2',cursive; cursor: pointer; transition: transform .12s,filter .12s; }
+.drag-race-answers button:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-2px); }
+.drag-race-answers button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #1552a5; }
+.drag-race-answers button:disabled { opacity: .65; cursor: default; }
+.drag-race-answers button small { position: absolute; top: 3px; left: 6px; color: #d7eaff; font: 800 9px 'Nunito',sans-serif; }
+.race-feedback,.race-result-panel { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 11px; font-size: 11px; font-weight: 800; line-height: 1.5; }
+.race-feedback-correct { background: #eaf9ef; color: #277748; }
+.race-feedback-try { background: #fff6e7; color: #946a20; }
+.race-feedback button,.race-result-panel button { flex: 0 0 auto; padding: 8px 11px; border: 0; border-radius: 9px; background: #347fdf; color: #fff; font: 900 10px 'Nunito',sans-serif; cursor: pointer; }
+.race-result-panel { flex-direction: column; padding: 20px; background: #eff8ff; color: #315f88; text-align: center; }
+.race-keyboard-hint { margin: 9px 0 0; color: #8a9caf; font-size: 9px; text-align: center; }
+@keyframes race-bounce { from { margin-top: -2px; } to { margin-top: 2px; } }
+
+@media (max-width: 520px) {
+  .drag-race-status { flex-wrap: wrap; font-size: 9px; }
+  .drag-race-scene { height: 230px; }
+  .race-road { right: 3%; left: 3%; }
+  .race-car { font-size: 30px; }
+  .drag-race-answers { gap: 6px; }
+  .drag-race-answers button { min-height: 48px; font-size: 18px; }
+  .race-feedback { align-items: stretch; flex-direction: column; }
+}

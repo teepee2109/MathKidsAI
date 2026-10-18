@@ -501,6 +501,33 @@ const assessmentSkills = [
   { code: "MEASUREMENT", name: "Đo lường", icon: "📏" },
   { code: "WORD_PROBLEM", name: "Toán có lời văn", icon: "🧩" },
 ];
+const placementTopicSkills = {
+  addition: "ARITHMETIC_ADD_SUB",
+  subtraction: "ARITHMETIC_ADD_SUB",
+  multiplication: "ARITHMETIC_MUL_DIV",
+  division: "ARITHMETIC_MUL_DIV",
+  geometry: "GEOMETRY",
+  "word-problems": "WORD_PROBLEM",
+};
+function placementSkillForTopic(topicCode, grade) {
+  if (topicCode === "measurement" && Number(grade) >= 2) return "MEASUREMENT";
+  if (topicCode === "time" && Number(grade) <= 2) return "MEASUREMENT";
+  return placementTopicSkills[topicCode] || null;
+}
+function masteredTopicsFromPlacement(summary, grade) {
+  const skillScores = new Map((Array.isArray(summary?.skillScores) ? summary.skillScores : [])
+    .map((skill) => [skill.code, Number(skill.score)]));
+  return Object.entries({
+    addition: placementSkillForTopic("addition", grade),
+    subtraction: placementSkillForTopic("subtraction", grade),
+    multiplication: placementSkillForTopic("multiplication", grade),
+    division: placementSkillForTopic("division", grade),
+    geometry: placementSkillForTopic("geometry", grade),
+    measurement: placementSkillForTopic("measurement", grade),
+    time: placementSkillForTopic("time", grade),
+    "word-problems": placementSkillForTopic("word-problems", grade),
+  }).flatMap(([topicCode, skillCode]) => skillCode && skillScores.get(skillCode) >= 80 ? [topicCode] : []);
+}
 const assessmentRandom = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 function buildAssessmentQuestions(grade) {
@@ -735,6 +762,10 @@ app.post("/api/auth/register/request-otp", async (request, response) => {
   const role = ["Student", "Parent"].includes(body.role) ? body.role : "Student";
   const errors = validateCredentials(body, true);
   if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
+  const grade = Number(body.grade);
+  if (role === "Student" && (!Number.isInteger(grade) || grade < 1 || grade > 5)) {
+    return response.status(400).json({ message: "Vui lòng chọn lớp hiện tại của học sinh từ lớp 1 đến lớp 5." });
+  }
   const email = body.email.trim().toLowerCase();
   try {
     await ensureEmailOtpSchema();
@@ -783,6 +814,10 @@ app.post("/api/auth/register", async (request, response) => {
   const role = ["Student", "Parent"].includes(body.role) ? body.role : "Student";
   const errors = validateCredentials(body, true);
   if (Object.keys(errors).length) return response.status(400).json({ message: "Dữ liệu không hợp lệ.", errors });
+  const grade = Number(body.grade);
+  if (role === "Student" && (!Number.isInteger(grade) || grade < 1 || grade > 5)) {
+    return response.status(400).json({ message: "Vui lòng chọn lớp hiện tại của học sinh từ lớp 1 đến lớp 5." });
+  }
   if (!/^\d{6}$/.test(String(body.otp || ""))) return response.status(400).json({ message: "Vui lòng nhập mã OTP gồm 6 chữ số." });
   const email = body.email.trim().toLowerCase();
   try {
@@ -810,7 +845,7 @@ app.post("/api/auth/register", async (request, response) => {
     }
 
     if (role === "Parent") await ensureParentModuleSchema();
-    const result = await registerUser({ ...body, email, role });
+    const result = await registerUser({ ...body, email, role, grade });
     await pool.request().input("otpId", sql.BigInt, otp.OtpId)
       .query("UPDATE [mk].[EmailRegistrationOtp] SET ConsumedAt=SYSUTCDATETIME() WHERE OtpId=@otpId AND ConsumedAt IS NULL");
     return response.status(201).json(result);
@@ -827,7 +862,7 @@ app.post("/api/auth/password-reset/request-otp", async (request, response) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 255) {
     return response.status(400).json({ message: "Email không hợp lệ." });
   }
-  const genericMessage = "Nếu email này đã đăng ký, mã OTP sẽ được gửi đến hộp thư của bạn.";
+  const genericMessage = "Nếu email thuộc tài khoản đang hoạt động, OTP sẽ được gửi khi yêu cầu chưa chạm giới hạn. Nếu bạn vừa yêu cầu mã, hãy chờ ít nhất 60 giây, kiểm tra Inbox/Spam rồi thử lại; giới hạn tối đa là 5 lần mỗi giờ.";
   try {
     await ensurePasswordResetOtpSchema();
     const pool = await getPool();
@@ -974,8 +1009,9 @@ app.post("/api/auth/login", async (request, response) => {
 app.post("/api/auth/google", async (request, response) => {
   try {
     const requestedRole = ["Student", "Parent"].includes(request.body?.role) ? request.body.role : undefined;
+    const requestedGrade = request.body?.grade;
     if (requestedRole === "Parent") await ensureParentModuleSchema();
-    return response.json(await loginWithGoogle(request.body?.credential, requestedRole));
+    return response.json(await loginWithGoogle(request.body?.credential, requestedRole, requestedGrade));
   }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Google thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
@@ -2108,19 +2144,17 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       WHERE pa.StudentId = @studentId AND pt.Grade = @grade AND pa.SubmittedAt IS NOT NULL
       ORDER BY pa.SubmittedAt DESC
     `) : { recordset: [] };
-    let placementScores = new Map();
+    let placementSummary = {};
     try {
-      const summary = JSON.parse(placementResult.recordset[0]?.AbilitySummary || "{}");
-      placementScores = new Map((summary.skillScores || []).map((skill) => [skill.code, Number(skill.score)]));
-    } catch { placementScores = new Map(); }
-    const topicPlacementSkill = {
-      addition: "ARITHMETIC_ADD_SUB", subtraction: "ARITHMETIC_ADD_SUB", decimals: "ARITHMETIC_ADD_SUB",
-      multiplication: "ARITHMETIC_MUL_DIV", division: "ARITHMETIC_MUL_DIV", fractions: "ARITHMETIC_MUL_DIV",
-      geometry: "GEOMETRY", time: "MEASUREMENT", percentage: "WORD_PROBLEM",
-    };
+      placementSummary = JSON.parse(placementResult.recordset[0]?.AbilitySummary || "{}");
+    } catch { placementSummary = {}; }
+    const placementScores = new Map((Array.isArray(placementSummary.skillScores) ? placementSummary.skillScores : [])
+      .map((skill) => [skill.code, Number(skill.score)]));
     for (const lesson of lessons) {
       lesson.weeklyAccuracy = weeklyTopicAccuracy.has(Number(lesson.topic.id)) ? weeklyTopicAccuracy.get(Number(lesson.topic.id)) : null;
-      lesson.placementAccuracy = placementScores.get(topicPlacementSkill[lesson.topic.code]) ?? null;
+      const placementSkill = placementSkillForTopic(lesson.topic.code, studentGrade);
+      lesson.placementAccuracy = placementSkill ? placementScores.get(placementSkill) ?? null : null;
+      lesson.isMastered = !lesson.isCompleted && lesson.placementAccuracy !== null && lesson.placementAccuracy >= 80;
       const relevantAccuracy = lesson.weeklyAccuracy ?? lesson.placementAccuracy;
       lesson.assessmentAccuracy = relevantAccuracy;
       lesson.assessmentSource = lesson.weeklyAccuracy !== null ? "Đánh giá tuần" : lesson.placementAccuracy !== null ? "Đánh giá đầu vào" : "";
@@ -2149,7 +2183,7 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
     const roadmapLessonIds = [];
     for (const item of roadmapResult.recordset) {
       const aliases = topicAliases[item.TopicCode] || [item.TopicCode?.toLowerCase()];
-      const candidate = aliases.map((code) => lessons.find((lesson) => lesson.topic.code === code && !lesson.isCompleted))
+      const candidate = aliases.map((code) => lessons.find((lesson) => lesson.topic.code === code && !lesson.isCompleted && !lesson.isMastered))
         .filter(Boolean).sort((a, b) => (a.accuracy ?? -1) - (b.accuracy ?? -1))[0];
       if (candidate && !roadmapLessonIds.includes(candidate.lessonId)) roadmapLessonIds.push(candidate.lessonId);
     }
@@ -2171,13 +2205,17 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       if (a.accuracy !== null && b.accuracy !== null && a.accuracy !== b.accuracy) return a.accuracy - b.accuracy;
       return a.sortOrder - b.sortOrder;
     });
-    let previousCompleted = true;
+    let hasUncompletedRequiredLesson = false;
     lessons.forEach((lesson, index) => {
       lesson.sequence = index + 1;
-      lesson.isLocked = !previousCompleted;
-      previousCompleted = lesson.isCompleted;
+      if (lesson.isMastered || lesson.isCompleted) {
+        lesson.isLocked = false;
+        return;
+      }
+      lesson.isLocked = hasUncompletedRequiredLesson;
+      hasUncompletedRequiredLesson = true;
     });
-    const recommended = lessons.find((lesson) => !lesson.isCompleted);
+    const recommended = lessons.find((lesson) => !lesson.isCompleted && !lesson.isMastered);
     const latestRoadmap = roadmapResult.recordset[0];
     return response.json({
       grade: Number(result.recordset[0]?.Grade || 0),
@@ -2187,6 +2225,7 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       difficultyLabel: ["", "Cơ bản", "Trung bình", "Nâng cao"][recommendedDifficulty],
       lessons,
       completedCount: lessons.filter((lesson) => lesson.isCompleted).length,
+      masteredCount: lessons.filter((lesson) => lesson.isMastered).length,
       recommendedLessonId: recommended?.lessonId || null,
       generatedBy: latestRoadmap?.GeneratedBy || (isPremium ? "Adaptive" : "System"),
       roadmapReason: latestRoadmap?.Reason || "",
@@ -2204,7 +2243,9 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
           : recommended.accuracy === null
             ? "Bắt đầu chủ đề mới theo chương trình lớp bạn."
             : `Ôn lại ${recommended.topic.name} để củng cố phần đang cần luyện.`
-        : "Bạn đã hoàn thành toàn bộ bài học trong lộ trình lớp này!",
+        : lessons.some((lesson) => lesson.isMastered)
+          ? "Con đã vững các nội dung được kiểm tra đầu vào. Những bài đó có thể bỏ qua; hãy khám phá thêm hoặc học phần tiếp theo nhé!"
+          : "Bạn đã hoàn thành toàn bộ bài học trong lộ trình lớp này!",
     });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải lộ trình học.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
@@ -2219,11 +2260,29 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
   try {
     await ensureLearningPathSchema();
     const pool = await getPool();
+    let masteredTopicCodes = [];
+    if (await hasActivePremium(pool, request.user.userId)) {
+      const placement = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
+        SELECT TOP 1 pa.AbilitySummary, pt.Grade
+        FROM [mk].[PlacementAttempt] pa
+        INNER JOIN [mk].[PlacementTest] pt ON pt.PlacementTestId = pa.PlacementTestId
+        INNER JOIN [mk].[Student] s ON s.StudentId = pa.StudentId AND s.Grade = pt.Grade
+        WHERE pa.StudentId = @studentId AND pa.SubmittedAt IS NOT NULL
+        ORDER BY pa.SubmittedAt DESC
+      `);
+      try {
+        masteredTopicCodes = masteredTopicsFromPlacement(
+          JSON.parse(placement.recordset[0]?.AbilitySummary || "{}"),
+          Number(placement.recordset[0]?.Grade || 0),
+        );
+      } catch { masteredTopicCodes = []; }
+    }
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const result = await transaction.request()
       .input("studentId", sql.Int, request.user.userId)
       .input("lessonId", sql.Int, Number(request.params.id))
+      .input("masteredTopicCodes", sql.NVarChar(500), masteredTopicCodes.join(","))
       .query(`
         IF NOT EXISTS (
           SELECT 1 FROM [mk].[Student] s
@@ -2238,6 +2297,7 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
               WHERE previousLesson.IsActive = 1
                 AND previousLesson.SortOrder < l.SortOrder
                 AND ISNULL(previousProgress.IsCompleted, 0) = 0
+                AND CHARINDEX(',' + previousTopic.TopicCode + ',', ',' + @masteredTopicCodes + ',') = 0
             )
         )
           SELECT CAST(0 AS BIT) AS IsAvailable, CAST(0 AS BIT) AS WasCompleted, CAST(NULL AS DATETIME2) AS CompletedAt, CAST(0 AS INT) AS PracticeCount,
@@ -2531,6 +2591,11 @@ app.post("/api/games/arcade/reward", authenticate, async (request, response) => 
     formula: { units: 3, activity: "ARCADE_FORMULA" },
     word: { units: 3, activity: "ARCADE_WORD" },
     geometry: { units: 3, activity: "ARCADE_GEOMETRY" },
+    crossmath: { units: 3, activity: "ARCADE_CROSSMATH" },
+    rectangles: { units: 3, activity: "ARCADE_RECTANGLES" },
+    "drag-race": { units: 3, activity: "ARCADE_DRAGRACE" },
+    rocket: { units: 3, activity: "ARCADE_ROCKET" },
+    ocean: { units: 3, activity: "ARCADE_OCEAN" },
   };
   const rule = gameRules[gameCode];
   if (!rule || !Number.isInteger(completedUnits) || completedUnits !== rule.units) {
