@@ -100,6 +100,12 @@ Body minh họa trên cần bổ sung đủ 10 câu trước khi gửi. Backend 
 
 Migration `migrations/WeeklyAssessment.sql` được chạy tự động khi backend khởi động. Học sinh có một bài 10 câu mỗi tuần (tuần bắt đầu thứ Hai theo giờ Việt Nam); câu hỏi được cố định khi bắt đầu và đáp án đúng chỉ trả về sau khi nộp. Mức luyện tập kế tiếp tăng một bậc khi đạt từ 80/100, giảm một bậc khi dưới 50/100, còn lại giữ nguyên (mức 1–3). Lộ trình bài học lấy mức này để chọn câu luyện tập từ Question Bank. Điểm đánh giá tuần dùng để cá nhân hóa độ khó, không cộng XP/sao.
 
+## Dữ liệu mục tiêu học tập
+
+`curriculum-objectives.v1.json` là danh mục mục tiêu theo lớp/chủ đề; `question-objective-mapping.v1.json` liên kết câu hỏi trong Question Bank với mục tiêu và ghi căn cứ cho từng liên kết. `curriculum-question-bank.v1.js` bổ sung câu hỏi có lời giải cho các mục tiêu trước đó chưa có câu, đồng thời khai báo những chủ đề/bài học còn thiếu; liên kết tới mục tiêu được tạo từ chính dữ liệu câu hỏi để tránh lệch câu chữ. Kiểm tra bằng `npm run curriculum:validate` trong thư mục `backend`; công cụ xác minh mục tiêu, chủ đề, câu hỏi, đáp án và lời giải, rồi in độ phủ cùng các mục tiêu còn thiếu. Khi backend khởi tạo lộ trình, `migrations/LearningObjectives.sql` tạo cấu trúc dữ liệu bổ sung; `curriculumCatalog.js` đồng bộ chủ đề/bài học/câu hỏi bổ sung, mục tiêu, quan hệ tiên quyết, liên kết mục tiêu-bài học và liên kết câu hỏi-mục tiêu. Các trường `Introduction`, `KeyConcept`, `WorkedExample` cũ được giữ nguyên, đồng thời sao lưu thành các khối nội dung có kiểu trong `[mk].[LessonContentBlock]`; API `GET /api/learning/path` trả thêm `contentBlocks` và `learningObjectives` cho từng bài.
+
+Nguồn tổng hợp kiến thức đang được đánh dấu `needs_teacher_review`. Toàn bộ liên kết câu hỏi mới được đồng bộ với `MappingStatus = 'needs-review'`; chưa dùng chúng để kết luận học sinh đã thành thạo hoặc tự bỏ qua bài. Không tự gắn tất cả câu trong cùng chủ đề vào mọi mục tiêu của chủ đề, vì như vậy số liệu năng lực sẽ thiếu chính xác. API lộ trình chỉ trả ứng viên bằng chứng 90 ngày; một mục tiêu chỉ có thể ảnh hưởng lộ trình sau khi chương trình được duyệt, liên kết câu hỏi được duyệt, và học sinh có ít nhất 5 lượt trả lời trên ít nhất 3 câu hỏi khác nhau. Giáo viên cần duyệt mục tiêu và từng liên kết câu hỏi trước khi chúng được phê duyệt làm bằng chứng cho lộ trình thích ứng.
+
 Nếu dùng named instance, SQL Server Browser hoặc TCP/IP phải được bật. Nếu instance dùng port cố định, đặt port đó trong `DB_PORT` và có thể bỏ `DB_INSTANCE`.
 
 ## Cấp quyền Admin

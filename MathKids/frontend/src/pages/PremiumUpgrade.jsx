@@ -6,13 +6,14 @@ import { getAuthToken } from "../authStorage";
 import "./PremiumUpgrade.css";
 
 const features = [
-  { label: "Làm bài kiểm tra trình độ", free: true, premium: true },
-  { label: "Xem điểm tổng & bản đồ kỹ năng", free: true, premium: true },
-  { label: "Lộ trình học cá nhân hóa bởi AI", free: false, premium: true },
-  { label: "Gợi ý bài học theo từng ngày", free: false, premium: true },
-  { label: "Theo dõi tiến bộ theo tuần", free: false, premium: true },
-  { label: "Bài luyện tập nâng cao theo điểm yếu", free: false, premium: true },
-  { label: "Báo cáo học tập & gợi ý hỗ trợ cho phụ huynh", free: false, premium: true },
+  { label: "Bài học theo chương trình lớp", detail: "Lý thuyết, ví dụ và bài luyện tập cơ bản.", free: true },
+  { label: "Đánh giá đầu vào và bản đồ kỹ năng", detail: "Xem kết quả tổng quan để biết con đang ở đâu.", free: true },
+  { label: "Trò chơi, thử thách ngày và phần thưởng", detail: "Chơi, tích lũy XP và đổi sao.", free: true },
+  { label: "Lộ trình thích ứng theo kết quả của con", detail: "Ưu tiên chủ đề con còn yếu dựa trên đánh giá và kết quả luyện tập.", free: false },
+  { label: "Nhận diện nội dung con đã vững", detail: "Bỏ qua mục tiêu đã thành thạo để dành thời gian cho phần cần học.", free: false },
+  { label: "Luyện theo mục tiêu và độ khó cao hơn", detail: "Chọn bài tập đúng kỹ năng cần củng cố, mở mức trung bình và nâng cao.", free: false },
+  { label: "Đánh giá năng lực hằng tuần", detail: "Kết quả tuần giúp điều chỉnh mức độ bài luyện tiếp theo.", free: false },
+  { label: "Báo cáo chi tiết cho phụ huynh", detail: "Xem tiến bộ và gợi ý hỗ trợ khi phụ huynh liên kết với tài khoản học sinh Premium.", free: false },
 ];
 
 export default function PremiumUpgrade() {
@@ -40,7 +41,7 @@ export default function PremiumUpgrade() {
 
   async function choosePlan(plan) {
     if (plan === "free") {
-      setNotice("Bạn đang sử dụng gói Free. Có thể nâng cấp Premium bất cứ lúc nào để mở khóa lộ trình.");
+      setNotice(premiumStatus.isPremium ? "Tài khoản Premium vẫn bao gồm toàn bộ quyền lợi của gói Free." : "Bạn đang sử dụng gói Free. Nâng cấp để mở lộ trình thích ứng và các công cụ Premium.");
       return;
     }
     if (premiumStatus.isPremium) {
@@ -75,14 +76,26 @@ export default function PremiumUpgrade() {
     }
   }
 
+  const featureList = (isPremiumPlan) => features.map((feature) => {
+    const included = isPremiumPlan || feature.free;
+    return <li className={included ? "plan-feature" : "plan-feature not-included"} key={feature.label}>
+      <span aria-hidden="true">{included ? "✓" : "🔒"}</span>
+      <div><strong>{feature.label}</strong><small>{feature.detail}</small></div>
+    </li>;
+  });
+
   return <main className="premium-page">
     <header className="premium-header"><BrandLogo to="/dashboard" /><Link to="/danh-gia">← Quay lại kết quả</Link></header>
-    <section className="premium-hero"><span className="premium-sparkle">✦</span><span className="premium-kicker">MATHKIDS PREMIUM</span><h1>Học đúng điều con cần,<br /><em>tiến bộ mỗi ngày</em></h1><p>AI đồng hành cùng con bằng một lộ trình vừa sức, vui vẻ và được cập nhật theo từng bước tiến bộ.</p></section>
-    <section className="premium-plans">
-      <article className="plan-card free-plan"><div className="plan-heading"><span className="plan-icon">🌱</span><div><h2>Free</h2><p>Khởi đầu vui học mỗi ngày</p></div></div><div className="plan-price"><strong>0đ</strong><span>/ mãi mãi</span></div><button onClick={() => choosePlan("free")} className="plan-button free-button">Gói hiện tại</button><ul>{features.filter((feature) => feature.free).map((feature) => <li key={feature.label}><span>✓</span>{feature.label}</li>)}{features.filter((feature) => !feature.free).slice(0, 2).map((feature) => <li className="not-included" key={feature.label}><span>—</span>{feature.label}</li>)}</ul></article>
-      <article className="plan-card premium-plan"><span className="popular-badge">{premiumStatus.isPremium ? "GÓI HIỆN TẠI" : "ĐƯỢC ĐỀ XUẤT"}</span><div className="plan-heading"><span className="plan-icon">👑</span><div><h2>Premium</h2><p>Mở khóa hành trình riêng cho con</p></div></div><div className="plan-price"><strong>99.000đ</strong><span>/ 30 ngày</span></div>{premiumStatus.loading ? <button className="plan-button premium-button" disabled>Đang kiểm tra gói…</button> : premiumStatus.isPremium ? <><div style={{ display: "flex", flexDirection: "column", gap: 3, margin: "13px 0 9px", padding: "11px 12px", border: "1px solid #c8ecd9", borderRadius: 10, background: "#effbf4", color: "#278357", fontSize: 12, fontWeight: 900 }}>Premium đang hoạt động{premiumStatus.subscription?.expiresAt && <span style={{ color: "#6f9a84", fontSize: 10, fontWeight: 700 }}>Hiệu lực đến {new Date(premiumStatus.subscription.expiresAt).toLocaleDateString("vi-VN")}</span>}</div><Link to="/hoc-tap" className="plan-button premium-button" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>Xem lộ trình học →</Link></> : <button onClick={() => choosePlan("premium")} className="plan-button premium-button" disabled={busy}>{busy ? "Đang tạo đơn…" : "Nâng cấp Premium →"}</button>}<ul>{features.map((feature) => <li key={feature.label}><span>✓</span>{feature.label}</li>)}</ul></article>
+    <section className="premium-hero"><span className="premium-sparkle">✦</span><span className="premium-kicker">MATHKIDS PREMIUM</span><h1>Học đúng điều con cần,<br /><em>tiến bộ mỗi ngày</em></h1><p>Free giúp con học kiến thức theo lớp. Premium dùng kết quả đánh giá và luyện tập để chọn phần cần củng cố, điều chỉnh độ khó và giúp con không phải học lại nội dung đã vững.</p></section>
+    <section className="premium-how" aria-label="Cách cá nhân hóa hoạt động">
+      <h2>Premium cá nhân hóa việc học như thế nào?</h2>
+      <div className="premium-how-steps"><article><span>1</span><div><strong>Ghi nhận kết quả</strong><small>Kết quả đánh giá và bài luyện theo từng chủ đề.</small></div></article><b aria-hidden="true">→</b><article><span>2</span><div><strong>Tìm phần cần học</strong><small>Phân biệt nội dung đã vững với kỹ năng còn cần luyện.</small></div></article><b aria-hidden="true">→</b><article><span>3</span><div><strong>Điều chỉnh bài tiếp theo</strong><small>Gợi ý mục tiêu và mức luyện phù hợp hơn.</small></div></article></div>
     </section>
-    <p className="premium-note">Có thể hủy bất cứ lúc nào · Thanh toán an toàn · Không ảnh hưởng kết quả học ở trường</p>
+    <section className="premium-plans">
+      <article className="plan-card free-plan"><div className="plan-heading"><span className="plan-icon">🌱</span><div><h2>Free</h2><p>Đủ để bắt đầu học mỗi ngày</p></div></div><div className="plan-price"><strong>0đ</strong><span>/ mãi mãi</span></div><button onClick={() => choosePlan("free")} className="plan-button free-button">{premiumStatus.isPremium ? "Bao gồm trong Premium" : "Gói hiện tại"}</button><ul>{featureList(false)}</ul></article>
+      <article className="plan-card premium-plan"><span className="popular-badge">{premiumStatus.isPremium ? "GÓI HIỆN TẠI" : "MỞ RỘNG HỌC TẬP"}</span><div className="plan-heading"><span className="plan-icon">👑</span><div><h2>Premium</h2><p>Thêm hỗ trợ sát với nhu cầu của con</p></div></div><div className="plan-price"><strong>99.000đ</strong><span>/ 30 ngày</span></div>{premiumStatus.loading ? <button className="plan-button premium-button" disabled>Đang kiểm tra gói…</button> : premiumStatus.isPremium ? <><div className="premium-current-status">Premium đang hoạt động{premiumStatus.subscription?.expiresAt && <span>Hiệu lực đến {new Date(premiumStatus.subscription.expiresAt).toLocaleDateString("vi-VN")}</span>}</div><Link to="/hoc-tap" className="plan-button premium-button premium-plan-link">Dùng lộ trình cá nhân hóa →</Link></> : <button onClick={() => choosePlan("premium")} className="plan-button premium-button" disabled={busy}>{busy ? "Đang tạo đơn…" : "Mở khóa Premium →"}</button>}<ul>{featureList(true)}</ul></article>
+    </section>
+    <p className="premium-note">Bài học theo chương trình, trò chơi và thử thách ngày vẫn có ở Free. Để mở báo cáo phụ huynh, tài khoản học sinh được liên kết cần có Premium.</p>
     {notice && <div className="premium-notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
   </main>;
 }

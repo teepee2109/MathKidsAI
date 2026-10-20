@@ -402,7 +402,7 @@ export async function loginWithGoogle(credential, requestedRole, requestedGrade)
         throw error;
     }
 
-    return findOrCreateExternalUser({ email: googleUser.email, name: googleUser.name, requestedRole, providerLabel: "Google" });
+    return findOrCreateExternalUser({ email: googleUser.email, name: googleUser.name, requestedRole, requestedGrade: studentGrade, providerLabel: "Google" });
 }
 
 let firebaseAuthPromise;
@@ -416,7 +416,7 @@ function getFirebaseAdminAuth() {
     return firebaseAuthPromise;
 }
 
-export async function loginWithFirebase(idToken, requestedRole) {
+export async function loginWithFirebase(idToken, requestedRole, requestedGrade) {
     if (!String(process.env.FIREBASE_PROJECT_ID || "").trim()) {
         const error = new Error("Firebase Authentication chưa được cấu hình trên máy chủ (thiếu FIREBASE_PROJECT_ID).");
         error.status = 503;
@@ -429,6 +429,12 @@ export async function loginWithFirebase(idToken, requestedRole) {
     }
     if (requestedRole !== undefined && !["Student", "Parent"].includes(requestedRole)) {
         const error = new Error("Vai trò đăng ký không hợp lệ.");
+        error.status = 400;
+        throw error;
+    }
+    const studentGrade = requestedRole === "Student" ? Number(requestedGrade) : 1;
+    if (requestedRole === "Student" && (!Number.isInteger(studentGrade) || studentGrade < 1 || studentGrade > 5)) {
+        const error = new Error("Vui lòng chọn lớp hiện tại từ lớp 1 đến lớp 5.");
         error.status = 400;
         throw error;
     }
@@ -452,11 +458,11 @@ export async function loginWithFirebase(idToken, requestedRole) {
         error.status = 403;
         throw error;
     }
-    return findOrCreateExternalUser({ email: firebaseUser.email, name: firebaseUser.name, requestedRole, providerLabel: "Firebase" });
+    return findOrCreateExternalUser({ email: firebaseUser.email, name: firebaseUser.name, requestedRole, requestedGrade: studentGrade, providerLabel: "Firebase" });
 }
 
 // Signs in (or creates) the AppUser that owns an email already verified by Google or Firebase.
-async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, providerLabel }) {
+async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, requestedGrade = 1, providerLabel }) {
     const email = rawEmail.trim().toLowerCase();
     if (requestedRole && !/@gmail\.com$/i.test(email)) {
         const error = new Error(`Email đăng ký bằng ${providerLabel} bắt buộc phải kết thúc bằng @gmail.com.`);
@@ -478,6 +484,7 @@ async function findOrCreateExternalUser({ email: rawEmail, name, requestedRole, 
             throw error;
         }
         const userRole = requestedRole || "Student";
+        const studentGrade = userRole === "Student" ? Number(requestedGrade) : 1;
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {

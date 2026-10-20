@@ -21,6 +21,7 @@ export default function StudentProfile() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [pageError, setPageError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [gradeChanged, setGradeChanged] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [passwordMessage, setPasswordMessage] = useState({ text: "", type: "" });
   const [changingPassword, setChangingPassword] = useState(false);
@@ -200,8 +201,10 @@ export default function StudentProfile() {
 
   async function saveProfile(event) {
     event.preventDefault();
+    const previousGrade = Number(profile.grade);
     setSaving(true);
     setSaved(false);
+    setGradeChanged(false);
     setPageError("");
     setFieldErrors({});
     try {
@@ -222,6 +225,7 @@ export default function StudentProfile() {
       setAvatarPreview("");
       const cached = getCachedUser() || {};
       saveCachedUser({ ...cached, ...data.profile });
+      setGradeChanged(Boolean(data.gradeChanged ?? previousGrade !== Number(data.profile.grade)));
       setSaved(true);
     } catch (error) {
       setPageError(error.message || "Không thể kết nối tới máy chủ.");
@@ -273,7 +277,7 @@ export default function StudentProfile() {
           <label className="profile-field"><span>Lớp</span><select name="grade" value={profile.grade} onChange={updateField}>{[1, 2, 3, 4, 5].map((grade) => <option value={grade} key={grade}>Lớp {grade}</option>)}</select>{fieldErrors.grade && <small>{fieldErrors.grade}</small>}</label>
         </div>
         {pageError && <div className="profile-message error" role="alert">{pageError}</div>}
-        {saved && <div className="profile-message success" role="status">Đã lưu hồ sơ thành công. Dashboard đã được cập nhật.</div>}
+        {saved && <div className="profile-message success" role="status">{gradeChanged ? <>Đã đổi sang lớp {profile.grade}. Bài đánh giá cũ vẫn nằm trong lịch sử. <Link to="/danh-gia">Làm đánh giá lớp mới để cập nhật lộ trình →</Link></> : "Đã lưu hồ sơ thành công. Dashboard đã được cập nhật."}</div>}
         <div className="profile-actions"><Link to="/dashboard">Hủy</Link><button type="submit" disabled={saving}>{saving ? "Đang lưu…" : "Lưu thay đổi"}</button></div>
       </form>}
 

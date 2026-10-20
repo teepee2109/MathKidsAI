@@ -17,31 +17,46 @@ function randomFreeCell(excluded = [], size = 40) {
 
 function getMathArcadeSpec(grade, round = 0) {
   if (grade === 1) {
-    const target = [10, 15, 20][round % 3];
-    return { target, targetLabel: String(target), display: String, lesson: ["Tìm các cặp số cộng lại bằng 10.", "Gom số để đạt 15; hãy đếm tiếp từ số lớn.", "Cộng các nhóm nhỏ để vừa đủ 20."][round % 3], pickups: [1, 2, 3, 4].map((value) => ({ value, label: `+${value}` })) };
+    const target = [8, 10, 12, 15, 18, 20][randomInt(0, 5)];
+    return { target, targetLabel: String(target), display: String, lesson: `Chọn các số nhỏ để nạp vừa đủ ${target}; thử tách số thành nhiều cách cộng.`, pickups: [1, 2, 3, 4, 5, 6].map((value) => ({ value, label: `+${value}` })) };
   }
   if (grade === 2) {
-    const lessons = ["Gom các số tròn chục để đủ 100.", "Tính các nhóm chục bằng phép cộng và bảng nhân.", "Chọn các chục phù hợp để tạo tròn 100."];
-    const pickups = round % 3 === 1 ? [[2, "+20"], [3, "+30"], [5, "+50"]] : [[1, "+10"], [2, "+20"], [5, "+50"]];
-    return { target: 10, targetLabel: "100", display: (value) => String(value * 10), lesson: lessons[round % 3], pickups: pickups.map(([value, label]) => ({ value, label })) };
+    const target = [8, 9, 10][randomInt(0, 2)];
+    const values = [1, 2, 3, 4, 5, 6];
+    return { target, targetLabel: String(target * 10), display: (value) => String(value * 10), lesson: `Gom các số tròn chục để nạp vừa đủ ${target * 10}.`, pickups: values.map((value) => ({ value, label: `+${value * 10}` })) };
   }
   if (grade === 3) {
-    const facts = round % 3 === 1
-      ? [[4, "24÷6"], [6, "36÷6"], [9, "45÷5"], [12, "48÷4"]]
-      : [[6, "2×3"], [8, "2×4"], [9, round % 3 === 2 ? "27÷3" : "3×3"], [12, round % 3 === 2 ? "48÷4" : "3×4"]];
-    return { target: 36, targetLabel: "36", display: String, lesson: ["Nhẩm tích trong bảng nhân để ghép đủ 36.", "Dùng phép chia để tìm giá trị mỗi nhóm rồi nạp đủ 36.", "Kết hợp phép nhân và chia để chọn năng lượng."][round % 3], pickups: facts.map(([value, label]) => ({ value, label })) };
+    const target = [24, 30, 36, 42, 48, 54][randomInt(0, 5)];
+    const values = [4, 6, 8, 9, 10, 12];
+    const pickups = values.map((value) => {
+      if (Math.random() < 0.5) {
+        let factor = 2;
+        while (factor <= 10 && value % factor !== 0) factor += 1;
+        return { value, label: `${factor}×${value / factor}` };
+      }
+      const divisor = randomInt(2, 10);
+      return { value, label: `${value * divisor}÷${divisor}` };
+    });
+    return { target, targetLabel: String(target), display: String, lesson: `Tính tích hoặc thương trên từng viên pin rồi ghép đủ ${target}.`, pickups };
   }
   if (grade === 4) {
-    const denominator = [5, 8, 10][round % 3];
-    const values = denominator === 4 ? [1, 2, 3] : denominator === 5 ? [1, 2, 3, 4] : [1, 2, 3, 5, 10];
-    return { target: denominator, targetLabel: `${denominator}/${denominator}`, display: (value) => `${value}/${denominator}`, lesson: ["Cộng phân số cùng mẫu để hoàn thành một đơn vị.", "Gom các phần năm bằng nhau; chú ý tử số còn thiếu.", "Quy các phần mười về cùng mẫu rồi ghép thành một đơn vị."][round % 3], pickups: values.map((value) => ({ value, label: `${value}/${denominator}` })) };
+    const denominator = [3, 4, 5, 6, 8, 10][randomInt(0, 5)];
+    const values = Array.from({ length: denominator - 1 }, (_, index) => index + 1);
+    return { target: denominator, targetLabel: `${denominator}/${denominator}`, display: (value) => `${value}/${denominator}`, lesson: `Gom các phân số có mẫu ${denominator} để hoàn thành một đơn vị.`, pickups: values.map((value) => ({ value, label: `${value}/${denominator}` })) };
   }
   if (round % 3 === 1) {
     return { target: 100, targetLabel: "100%", display: (value) => `${value}%`, lesson: "Gom các phần trăm để hoàn thành 100%.", pickups: [10, 20, 25, 50].map((value) => ({ value, label: `${value}%` })) };
   }
-  const values = round % 3 === 2 ? [1, 3, 4, 7] : [2, 5, 10];
-  const labels = round % 3 === 2 ? ["0,1", "0,3", "0,4", "0,7"] : ["0,2", "0,5", "1,0"];
-  return { target: 20, targetLabel: "2,0", display: (value) => (value / 10).toFixed(1).replace(".", ","), lesson: round % 3 === 2 ? "Ghép các số thập phân khác nhau đến đúng 2,0." : "Cộng số thập phân đến đúng 2,0; đừng để quá tải.", pickups: values.map((value, index) => ({ value, label: labels[index] })) };
+  if (round % 3 === 0) {
+    const target = [15, 20, 25, 30][randomInt(0, 3)];
+    const values = [1, 2, 3, 4, 5, 6, 8, 10, 12];
+    const display = (value) => (value / 10).toFixed(1).replace(".", ",");
+    return { target, targetLabel: display(target), display, lesson: `Cộng số thập phân theo hàng phần mười để đạt ${display(target)}.`, pickups: values.map((value) => ({ value, label: display(value) })) };
+  }
+  const target = [150, 200, 250, 300][randomInt(0, 3)];
+  const values = [10, 20, 25, 30, 40, 50, 75, 100];
+  const display = (value) => (value / 100).toFixed(2).replace(".", ",");
+  return { target, targetLabel: display(target), display, lesson: `Ghép các số thập phân đến hàng phần trăm để đạt ${display(target)}.`, pickups: values.map((value) => ({ value, label: display(value) })) };
 }
 
 function randomMathPickup(spec) {
@@ -160,11 +175,12 @@ function createEquation(grade, usedAnswers) {
       else if (kind === 2) { left = randomInt(2, 10); right = randomInt(2, 10); operator = "×"; answer = left * right; }
       else { answer = randomInt(2, 10); right = randomInt(2, 10); left = answer * right; operator = "÷"; }
     } else if (grade === 4) {
-      if (Math.random() < 0.45) {
-        left = randomInt(1000, 30000); right = randomInt(1000, 99999 - left); answer = left + right;
-      } else if (Math.random() < 0.3) {
-        left = randomInt(10000, 99999); right = randomInt(1000, left); operator = "−"; answer = left - right;
-      } else {
+      const kind = randomInt(0, 4);
+      if (kind === 0) { left = randomInt(1000, 30000); right = randomInt(1000, 99999 - left); answer = left + right; }
+      else if (kind === 1) { left = randomInt(10000, 99999); right = randomInt(1000, left); operator = "−"; answer = left - right; }
+      else if (kind === 2) { left = randomInt(12, 999); right = randomInt(2, 9); operator = "×"; answer = left * right; }
+      else if (kind === 3) { right = randomInt(2, 9); answer = randomInt(12, 999); left = answer * right; operator = "÷"; }
+      else {
         const denominator = [2, 3, 4, 5, 8, 10][randomInt(0, 5)];
         const first = randomInt(1, denominator - 1); const second = randomInt(1, denominator - 1);
         left = `${first}/${denominator}`; right = `${second}/${denominator}`;
@@ -219,7 +235,7 @@ function makeGardenRound(grade, index) {
 
 function makeBalanceTiles(grade, round) {
   if (grade === 4) {
-    const denominator = [4, 5, 10][round % 3];
+    const denominator = [5, 6, 8, 10][randomInt(0, 3)];
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const a = randomInt(1, denominator - 1); const b = randomInt(1, denominator - 1); const c = randomInt(1, denominator - 1); const d = a + b - c;
       if (d >= 1 && d < denominator && new Set([a, b, c, d]).size === 4) return [a, b, c, d].map((value, index) => ({ id: `${round}-${index}`, value, display: `${value}/${denominator}`, denominator, side: "tray" })).sort(() => Math.random() - 0.5);
@@ -699,7 +715,7 @@ function BalanceGame({ grade }) {
   const roundFocus = grade === 1 ? ["Cộng nhóm số nhỏ.", "Tách số thành hai phần rồi cộng.", "Dùng phép trừ để tạo cùng giá trị."][round]
     : grade === 2 ? ["So sánh tổng các số.", "Tách số chục bằng phép cộng.", "Tính tích trong bảng nhân."][round]
       : grade === 3 ? ["Cân bằng các số.", "Tính thương trên từng khối.", "Tính tích trong bảng nhân."][round]
-        : grade === 4 ? ["Ghép các phân số mẫu 5.", "Ghép các phân số mẫu 8.", "Ghép các phân số mẫu 10."][round]
+        : grade === 4 ? `Ghép các phân số mẫu ${balanceDenominator}.`
           : ["Cân bằng số thập phân.", "Đổi số thập phân sang phần trăm tương ứng.", "Cân bằng số thập phân lớn hơn."][round];
 
   useEffect(() => {

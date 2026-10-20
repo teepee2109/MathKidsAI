@@ -243,7 +243,9 @@ FROM (VALUES
 JOIN [mk].[Topics] t ON t.GradeId = seed.GradeId AND t.TopicCode = seed.TopicCode
 WHERE NOT EXISTS (
   SELECT 1 FROM [mk].[Questions] existing
-  WHERE existing.TopicId = t.TopicId AND existing.QuestionText = seed.QuestionText
+  WHERE existing.TopicId = t.TopicId
+    AND DATALENGTH(existing.QuestionText) = DATALENGTH(seed.QuestionText)
+    AND existing.QuestionText COLLATE Latin1_General_100_BIN2 = seed.QuestionText COLLATE Latin1_General_100_BIN2
 );
 
 -- Expand the theory cards with explanation, steps, memory tips and common mistakes.
@@ -358,7 +360,12 @@ FROM (VALUES
   (5,'measurement',N'Đơn vị của thể tích là?',N'm',N'm²',N'm³',N'km','C',1,N'Thể tích dùng đơn vị khối như m³.')
 ) seed(GradeId, TopicCode, QuestionText, OptionA, OptionB, OptionC, OptionD, CorrectAnswer, Difficulty, Explanation)
 JOIN [mk].[Topics] t ON t.GradeId = seed.GradeId AND t.TopicCode = seed.TopicCode
-WHERE NOT EXISTS (SELECT 1 FROM [mk].[Questions] q WHERE q.TopicId = t.TopicId AND q.QuestionText = seed.QuestionText);
+WHERE NOT EXISTS (
+  SELECT 1 FROM [mk].[Questions] q
+  WHERE q.TopicId = t.TopicId
+    AND DATALENGTH(q.QuestionText) = DATALENGTH(seed.QuestionText)
+    AND q.QuestionText COLLATE Latin1_General_100_BIN2 = seed.QuestionText COLLATE Latin1_General_100_BIN2
+);
 
 -- Expand the ten additional daily topics after they are inserted above.
 UPDATE l

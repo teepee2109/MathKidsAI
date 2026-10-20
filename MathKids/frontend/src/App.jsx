@@ -5,6 +5,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import StudentProfile from "./pages/StudentProfile";
 import StudentRewards from "./pages/StudentRewards";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminCurriculumReview from "./pages/AdminCurriculumReview";
 import MathGames from "./pages/MathGames";
 import PlacementAssessment from "./pages/PlacementAssessment";
 import PremiumUpgrade from "./pages/PremiumUpgrade";
@@ -64,6 +65,7 @@ function AppRoutes() {
     <Route path="/home" element={<Home isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
     <Route path="/dashboard" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : currentUser?.role === "Parent" ? <Navigate to="/parent/dashboard" replace /> : <StudentDashboard onLogout={handleLogout} />} />
     <Route path="/admin/dashboard" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to={dashboardPath} replace />} />
+    <Route path="/admin/curriculum-review" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <AdminCurriculumReview onLogout={handleLogout} /> : <Navigate to={dashboardPath} replace />} />
     <Route path="/ho-so" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : <StudentProfile />} />
     <Route path="/phan-thuong" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : <StudentRewards />} />
     <Route path="/hoc-tap" element={!isAuthenticated ? <Navigate to="/dang-nhap" replace /> : currentUser?.role === "Admin" ? <Navigate to="/admin/dashboard" replace /> : <LearningPathRoute onLogout={handleLogout} />} />

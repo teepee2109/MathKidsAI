@@ -145,6 +145,7 @@ export default function AdminDashboard({ onLogout }) {
       <a className="admin-nav-item active" href="#overview"><span>▦</span> Tổng quan</a>
       <a className="admin-nav-item" href="#reports"><span>▤</span> Báo cáo</a>
       <a className="admin-nav-item" href="#accounts"><span>♙</span> Tài khoản</a>
+      <a className="admin-nav-item" href="/admin/curriculum-review"><span>✓</span> Duyệt học liệu</a>
       <div className="admin-sidebar-bottom"><span className="admin-shield">🛡️</span><div><strong>Khu vực quản trị</strong><small>Chỉ dành cho Admin</small></div></div>
     </aside>
 

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "framework": {
+    "name": "Chương trình giáo dục phổ thông 2018 - Toán tiểu học",
+    "sourceDocument": "Tổng hợp kiến thức Toán Tiểu học (Lớp 1 - 5) - Chương trình GDPT 2018.docx",
+    "verificationStatus": "needs_teacher_review",
+    "note": "Danh mục này chuẩn hóa mục tiêu từ tài liệu tham khảo và mã chủ đề đang có trong MathKids; cần giáo viên đối chiếu chương trình chính thức trước khi dùng làm căn cứ đánh giá hoặc miễn học."
+  },
+  "lessonContentContract": {
+    "introduction": "Nêu tình huống gần gũi và mục tiêu bài học bằng lời phù hợp độ tuổi.",
+    "theoryConcepts": [
+      { "id": "stable-concept-code", "explanation": "Một ý kiến thức ngắn, chính xác; không chỉ ghi công thức.", "visualRepresentation": "Mô hình hoặc hình ảnh giúp học sinh nhìn thấy ý nghĩa." }
+    ],
+    "workedExamples": [
+      { "problem": "Đề bài mẫu", "steps": ["Bước làm kèm lý do"], "answer": "Kết quả và đơn vị", "verification": "Cách tự kiểm tra" }
+    ],
+    "commonMisconceptions": [
+      { "misconception": "Lỗi học sinh thường mắc", "whyItIsWrong": "Giải thích nguyên nhân", "correction": "Cách sửa và làm lại" }
+    ],
+    "practiceQuestionTags": ["objectiveCode", "difficulty:1-3", "questionType", "explanation"],
+    "visualSupports": [
+      { "type": "picture|diagram|manipulative|number_line", "purpose": "Ý tưởng cần minh họa", "altText": "Mô tả hình cho hỗ trợ tiếp cận" }
+    ]
+  },
+  "grades": [
+    {
+      "grade": 1,
+      "topics": [
+        { "topicCode": "place-value", "title": "Số tự nhiên trong phạm vi 100", "strandCode": "number_and_operations", "sequence": 1, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Số và Phép tính", "objectives": [
+          { "code": "G1.NUMBER.REPRESENT", "outcome": "Đọc, viết, so sánh và xếp thứ tự số trong phạm vi 100.", "prerequisites": [] },
+          { "code": "G1.NUMBER.TENS_ONES", "outcome": "Biểu diễn số có hai chữ số thành chục và đơn vị.", "prerequisites": ["G1.NUMBER.REPRESENT"] }
+        ] },
+        { "topicCode": "addition", "title": "Ý nghĩa và phép cộng", "strandCode": "number_and_operations", "sequence": 2, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Số và Phép tính", "objectives": [
+          { "code": "G1.ADD.MEANING", "outcome": "Diễn tả phép cộng bằng gộp hai nhóm hoặc thêm vào một nhóm.", "prerequisites": ["G1.NUMBER.REPRESENT"] },
+          { "code": "G1.ADD.WITHIN_100", "outcome": "Cộng không nhớ trong phạm vi 100 theo tài liệu nguồn; nêu được cách đếm hoặc tách số đã dùng.", "prerequisites": ["G1.NUMBER.TENS_ONES"] }
+        ] },
+        { "topicCode": "subtraction", "title": "Ý nghĩa và phép trừ", "strandCode": "number_and_operations", "sequence": 3, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Số và Phép tính", "objectives": [
+          { "code": "G1.SUB.MEANING", "outcome": "Diễn tả phép trừ bằng bớt đi, tách ra hoặc tìm phần chênh lệch.", "prerequisites": ["G1.ADD.MEANING"] },
+          { "code": "G1.SUB.WITHIN_100", "outcome": "Trừ không nhớ trong phạm vi 100 theo tài liệu nguồn và kiểm tra kết quả bằng phép cộng phù hợp.", "prerequisites": ["G1.NUMBER.TENS_ONES"] }
+        ] },
+        { "topicCode": "geometry", "title": "Vị trí, hình phẳng và hình khối quen thuộc", "strandCode": "geometry_and_measurement", "sequence": 4, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Hình học và Đo lường", "objectives": [
+          { "code": "G1.GEO.POSITION", "outcome": "Mô tả vị trí tương đối bằng các từ trên-dưới, phải-trái, trước-sau và ở giữa.", "prerequisites": [] },
+          { "code": "G1.GEO.SHAPES", "outcome": "Nhận biết hình vuông, hình tròn, hình tam giác, hình chữ nhật và một số khối qua vật thật.", "prerequisites": [] }
+        ] },
+        { "topicCode": "measurement", "title": "So sánh và đo độ dài", "strandCode": "geometry_and_measurement", "sequence": 5, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Hình học và Đo lường", "objectives": [
+          { "code": "G1.MEASURE.COMPARE_LENGTH", "outcome": "So sánh độ dài và đo bằng đơn vị tự quy ước hoặc xăng-ti-mét.", "prerequisites": ["G1.NUMBER.REPRESENT"] },
+          { "code": "G1.MEASURE.READ_RULER", "outcome": "Đặt điểm đầu ở vạch 0, đọc vạch cuối và ghi số đo kèm đơn vị cm.", "prerequisites": ["G1.MEASURE.COMPARE_LENGTH"] }
+        ] },
+        { "topicCode": "time", "title": "Giờ đúng và ngày trong tuần", "strandCode": "geometry_and_measurement", "sequence": 6, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Hình học và Đo lường", "objectives": [
+          { "code": "G1.TIME.O_CLOCK", "outcome": "Đọc giờ đúng trên đồng hồ kim và nhận biết thứ tự các ngày trong tuần.", "prerequisites": [] }
+        ] },
+        { "topicCode": "statistics", "title": "Thu thập, phân loại và đếm", "strandCode": "statistics_and_probability", "sequence": 7, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 1 · Hoạt động thực hành trải nghiệm", "objectives": [
+          { "code": "G1.DATA.CLASSIFY_COUNT", "outcome": "Phân loại đồ vật theo một tiêu chí rõ ràng rồi đếm mỗi nhóm không bỏ sót hoặc đếm trùng.", "prerequisites": ["G1.NUMBER.REPRESENT"] }
+        ] }
+      ]
+    },
+    {
+      "grade": 2,
+      "topics": [
+        { "topicCode": "place-value", "title": "Số tự nhiên trong phạm vi 1 000", "strandCode": "number_and_operations", "sequence": 1, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Số và Phép tính", "objectives": [
+          { "code": "G2.NUMBER.TO_1000", "outcome": "Đọc, viết, so sánh số đến 1 000 và phân tích thành trăm, chục, đơn vị.", "prerequisites": ["G1.NUMBER.TENS_ONES"] }
+        ] },
+        { "topicCode": "addition", "title": "Cộng và trừ có nhớ", "strandCode": "number_and_operations", "sequence": 2, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Số và Phép tính", "objectives": [
+          { "code": "G2.ADD_SUB.REGROUP", "outcome": "Cộng, trừ có nhớ trong phạm vi lớp học, đặt các chữ số thẳng cột và giải thích việc đổi chục-trăm.", "prerequisites": ["G2.NUMBER.TO_1000"] }
+        ] },
+        { "topicCode": "multiplication", "title": "Phép nhân là các nhóm bằng nhau", "strandCode": "number_and_operations", "sequence": 3, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Số và Phép tính", "objectives": [
+          { "code": "G2.MULTIPLY.EQUAL_GROUPS", "outcome": "Mô hình hóa phép nhân bằng các nhóm có số phần tử bằng nhau và phép cộng lặp.", "prerequisites": ["G2.ADD_SUB.REGROUP"] },
+          { "code": "G2.MULTIPLY.TABLES_2_5", "outcome": "Lập và vận dụng bảng nhân 2, bảng nhân 5 trong tình huống phù hợp.", "prerequisites": ["G2.MULTIPLY.EQUAL_GROUPS"] }
+        ] },
+        { "topicCode": "division", "title": "Chia đều và chia theo nhóm", "strandCode": "number_and_operations", "sequence": 4, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Số và Phép tính", "objectives": [
+          { "code": "G2.DIVIDE.MEANING", "outcome": "Biểu diễn phép chia bằng chia thành các phần bằng nhau hoặc lập các nhóm bằng nhau.", "prerequisites": ["G2.MULTIPLY.EQUAL_GROUPS"] },
+          { "code": "G2.DIVIDE.TABLES_2_5", "outcome": "Liên hệ phép chia với bảng nhân 2 và 5 trong phạm vi đã học.", "prerequisites": ["G2.DIVIDE.MEANING"] }
+        ] },
+        { "topicCode": "geometry", "title": "Điểm, đường, đoạn thẳng và đường gấp khúc", "strandCode": "geometry_and_measurement", "sequence": 5, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Hình học phẳng và Hình khối", "objectives": [
+          { "code": "G2.GEO.LINES", "outcome": "Nhận biết điểm, đoạn thẳng, đường thẳng, đường cong và ba điểm thẳng hàng.", "prerequisites": ["G1.GEO.POSITION"] },
+          { "code": "G2.GEO.BROKEN_LINE", "outcome": "Tính độ dài đường gấp khúc bằng tổng độ dài các đoạn thành phần.", "prerequisites": ["G1.MEASURE.READ_RULER"] },
+          { "code": "G2.GEO.SOLIDS", "outcome": "Nhận biết khối trụ và khối cầu qua vật thật.", "prerequisites": ["G1.GEO.SHAPES"] }
+        ] },
+        { "topicCode": "measurement", "title": "Đơn vị đo độ dài, khối lượng, dung tích và nhiệt độ", "strandCode": "geometry_and_measurement", "sequence": 6, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Hình học và Đo lường", "objectives": [
+          { "code": "G2.MEASURE.UNITS", "outcome": "Đọc và sử dụng các đơn vị độ dài, ki-lô-gam, lít và độ C trong ngữ cảnh phù hợp.", "prerequisites": ["G1.MEASURE.READ_RULER"] },
+          { "code": "G2.MEASURE.CONVERT_LENGTH", "outcome": "Đổi một số đơn vị độ dài quen thuộc và đưa số đo về cùng đơn vị trước khi tính.", "prerequisites": ["G2.MEASURE.UNITS"] }
+        ] },
+        { "topicCode": "time", "title": "Đồng hồ và lịch", "strandCode": "geometry_and_measurement", "sequence": 7, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Thời gian và Tiền tệ", "objectives": [
+          { "code": "G2.TIME.READ_5_MINUTES", "outcome": "Đọc đồng hồ chính xác đến 5 phút và sử dụng lịch ngày-tháng.", "prerequisites": ["G1.TIME.O_CLOCK"] }
+        ] },
+        { "topicCode": "money", "title": "Tiền Việt Nam và mua bán đơn giản", "strandCode": "geometry_and_measurement", "sequence": 9, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 2 · Thời gian và Tiền tệ", "objectives": [
+          { "code": "G2.MONEY.RECOGNIZE", "outcome": "Nhận biết một số mệnh giá tiền Việt Nam và giải quyết tình huống mua bán đơn giản.", "prerequisites": ["G2.ADD_SUB.REGROUP"] }
+        ] },
+        { "topicCode": "statistics", "title": "Phân loại dữ liệu và biểu đồ tranh", "strandCode": "statistics_and_probability", "sequence": 8, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 2 · Thống kê và Xác suất", "objectives": [
+          { "code": "G2.DATA.PICTURE_GRAPH", "outcome": "Đọc biểu đồ tranh theo chú giải, đếm số lượng và so sánh các nhóm.", "prerequisites": ["G1.DATA.CLASSIFY_COUNT"] },
+          { "code": "G2.PROBABILITY.WORDS", "outcome": "Dùng đúng các từ chắc chắn, có thể, không thể để mô tả sự kiện đơn giản.", "prerequisites": ["G1.DATA.CLASSIFY_COUNT"] }
+        ] }
+      ]
+    },
+    {
+      "grade": 3,
+      "topics": [
+        { "topicCode": "place-value", "title": "Số tự nhiên đến 100 000 và làm tròn", "strandCode": "number_and_operations", "sequence": 1, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 3 · Số và Phép tính", "objectives": [
+          { "code": "G3.NUMBER.TO_100000", "outcome": "Đọc, viết, so sánh số đến 100 000 theo giá trị các hàng.", "prerequisites": ["G2.NUMBER.TO_1000"] },
+          { "code": "G3.NUMBER.ROUND", "outcome": "Ước lượng và làm tròn số đến hàng chục hoặc hàng trăm theo yêu cầu.", "prerequisites": ["G3.NUMBER.TO_100000"] }
+        ] },
+        { "topicCode": "multiplication", "title": "Bảng nhân và nhân số nhiều chữ số", "strandCode": "number_and_operations", "sequence": 2, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 3 · Số và Phép tính", "objectives": [
+          { "code": "G3.MULTIPLY.TABLES_3_9", "outcome": "Vận dụng bảng nhân từ 3 đến 9 để tính và giải tình huống nhóm bằng nhau.", "prerequisites": ["G2.MULTIPLY.TABLES_2_5"] },
+          { "code": "G3.MULTIPLY.MULTI_DIGIT_BY_ONE", "outcome": "Nhân số có nhiều chữ số với số có một chữ số, giữ đúng giá trị từng hàng.", "prerequisites": ["G3.MULTIPLY.TABLES_3_9", "G3.NUMBER.TO_100000"] }
+        ] },
+        { "topicCode": "division", "title": "Phép chia hết và chia có dư", "strandCode": "number_and_operations", "sequence": 3, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 3 · Số và Phép tính", "objectives": [
+          { "code": "G3.DIVIDE.MULTI_DIGIT_BY_ONE", "outcome": "Chia số có nhiều chữ số cho số có một chữ số bằng cách chia theo hàng.", "prerequisites": ["G3.MULTIPLY.TABLES_3_9"] },
+          { "code": "G3.DIVIDE.REMAINDER", "outcome": "Nhận biết số dư nhỏ hơn số chia và kiểm tra bằng số chia × thương + số dư.", "prerequisites": ["G3.DIVIDE.MULTI_DIGIT_BY_ONE"] }
+        ] },
+        { "topicCode": "fractions", "title": "Biểu diễn phân số bằng các phần bằng nhau", "strandCode": "number_and_operations", "sequence": 4, "scope": "needs-review", "appMapping": "mapped", "sourceSection": "Bài học đang có trong web; tài liệu nguồn cần đối chiếu bổ sung", "objectives": [
+          { "code": "G3.FRACTION.REPRESENT", "outcome": "Biểu diễn một số phần được lấy trong các phần bằng nhau bằng phân số.", "prerequisites": ["G1.GEO.SHAPES"] }
+        ] },
+        { "topicCode": "expressions", "title": "Tính giá trị biểu thức", "strandCode": "number_and_operations", "sequence": 5, "scope": "needs-review", "appMapping": "mapped", "sourceSection": "Bổ sung trong ngân hàng bài học hiện tại; cần rà soát phạm vi lớp", "objectives": [
+          { "code": "G3.EXPRESSION.ORDER", "outcome": "Thực hiện phép tính theo thứ tự được dạy, bao gồm vai trò của dấu ngoặc khi phù hợp.", "prerequisites": ["G3.MULTIPLY.TABLES_3_9", "G3.NUMBER.TO_100000"] }
+        ] },
+        { "topicCode": "divisibility", "title": "Dấu hiệu chia hết cơ bản", "strandCode": "number_and_operations", "sequence": 6, "scope": "extension", "appMapping": "mapped", "sourceSection": "Đang gắn ở lớp 3 trong web; tài liệu nguồn nêu dấu hiệu chia hết tại lớp 4", "objectives": [
+          { "code": "G3.DIVISIBILITY.PATTERNS", "outcome": "Khám phá dấu hiệu chia hết như nội dung mở rộng; không dùng làm điều kiện tiên quyết cho bài cốt lõi lớp 3.", "prerequisites": ["G3.DIVIDE.MULTI_DIGIT_BY_ONE"] }
+        ] },
+        { "topicCode": "geometry", "title": "Góc, hình tròn, chu vi và diện tích cơ bản", "strandCode": "geometry_and_measurement", "sequence": 7, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 3 · Hình học và Đo lường", "objectives": [
+          { "code": "G3.GEO.ANGLES", "outcome": "Nhận biết góc vuông và góc không vuông, dùng ê-ke để kiểm tra hoặc vẽ góc vuông.", "prerequisites": ["G2.GEO.LINES"] },
+          { "code": "G3.GEO.CIRCLE", "outcome": "Nhận biết tâm, bán kính và đường kính; liên hệ đường kính với bán kính.", "prerequisites": ["G1.GEO.SHAPES"] },
+          { "code": "G3.GEO.PERIMETER_AREA", "outcome": "Tính chu vi các hình quen thuộc và diện tích hình chữ nhật, hình vuông bằng cm².", "prerequisites": ["G3.GEO.ANGLES", "G1.MEASURE.READ_RULER"] }
+        ] },
+        { "topicCode": "measurement", "title": "Đơn vị đo và thời gian", "strandCode": "geometry_and_measurement", "sequence": 8, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 3 · Hình học và Đo lường", "objectives": [
+          { "code": "G3.MEASURE.UNITS", "outcome": "Sử dụng mm, g và ml trong tình huống đo phù hợp.", "prerequisites": ["G2.MEASURE.UNITS"] },
+          { "code": "G3.TIME.CALENDAR", "outcome": "Đọc thời gian đến phút và sử dụng thông tin ngày-tháng theo nội dung lớp.", "prerequisites": ["G2.TIME.READ_5_MINUTES"] }
+        ] },
+        { "topicCode": "statistics", "title": "Bảng số liệu và nhận xét", "strandCode": "statistics_and_probability", "sequence": 9, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 3 · Thống kê và Xác suất", "objectives": [
+          { "code": "G3.DATA.TABLE", "outcome": "Ghi, đọc và rút ra nhận xét đơn giản từ bảng số liệu.", "prerequisites": ["G2.DATA.PICTURE_GRAPH"] },
+          { "code": "G3.PROBABILITY.EXPERIMENT", "outcome": "Quan sát kết quả lặp lại của trò chơi ngẫu nhiên và mô tả khả năng xảy ra bằng lời.", "prerequisites": ["G2.PROBABILITY.WORDS"] }
+        ] }
+      ]
+    },
+    {
+      "grade": 4,
+      "topics": [
+        { "topicCode": "place-value", "title": "Số đến lớp triệu và làm tròn", "strandCode": "number_and_operations", "sequence": 1, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Số và Phép tính", "objectives": [
+          { "code": "G4.NUMBER.MILLIONS", "outcome": "Đọc, viết, phân tích và làm tròn số đến lớp triệu theo hàng được yêu cầu.", "prerequisites": ["G3.NUMBER.TO_100000", "G3.NUMBER.ROUND"] }
+        ] },
+        { "topicCode": "multiplication", "title": "Tính chất phép tính và phép nhân chia", "strandCode": "number_and_operations", "sequence": 2, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Số và Phép tính", "objectives": [
+          { "code": "G4.OPERATION.PROPERTIES", "outcome": "Nhận biết và vận dụng tính chất giao hoán, kết hợp, nhân một số với tổng hoặc hiệu.", "prerequisites": ["G3.MULTIPLY.MULTI_DIGIT_BY_ONE"] },
+          { "code": "G4.MULTIPLY_DIVIDE.MULTI_DIGIT", "outcome": "Thực hiện phép nhân, chia số nhiều chữ số theo phạm vi và cách làm của lớp.", "prerequisites": ["G4.NUMBER.MILLIONS"] }
+        ] },
+        { "topicCode": "divisibility", "title": "Dấu hiệu chia hết cho 2, 3, 5 và 9", "strandCode": "number_and_operations", "sequence": 3, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Số và Phép tính", "objectives": [
+          { "code": "G4.DIVISIBILITY.TESTS", "outcome": "Dùng dấu hiệu chia hết cho 2, 3, 5, 9 và giải thích bằng chữ số tận cùng hoặc tổng chữ số.", "prerequisites": ["G4.NUMBER.MILLIONS"] }
+        ] },
+        { "topicCode": "fractions", "title": "Phân số và bốn phép tính", "strandCode": "number_and_operations", "sequence": 4, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Số và Phép tính", "objectives": [
+          { "code": "G4.FRACTION.EQUIVALENCE", "outcome": "Nhận biết phân số bằng nhau, rút gọn, quy đồng và so sánh phân số.", "prerequisites": ["G3.FRACTION.REPRESENT"] },
+          { "code": "G4.FRACTION.OPERATIONS", "outcome": "Thực hiện cộng, trừ, nhân, chia phân số và tìm phân số của một số theo nội dung lớp.", "prerequisites": ["G4.FRACTION.EQUIVALENCE", "G3.MULTIPLY.MULTI_DIGIT_BY_ONE"] }
+        ] },
+        { "topicCode": "geometry", "title": "Góc, đường thẳng và hình bình hành, hình thoi", "strandCode": "geometry_and_measurement", "sequence": 5, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 4 · Hình học và Đo lường", "objectives": [
+          { "code": "G4.GEO.ANGLES_LINES", "outcome": "Nhận biết và đo góc; nhận biết hai đường thẳng vuông góc hoặc song song.", "prerequisites": ["G3.GEO.ANGLES"] },
+          { "code": "G4.GEO.PARALLELOGRAM_RHOMBUS", "outcome": "Mô tả đặc điểm, tính chu vi và diện tích hình bình hành, hình thoi theo công thức đã học.", "prerequisites": ["G3.GEO.PERIMETER_AREA"] }
+        ] },
+        { "topicCode": "measurement", "title": "Đơn vị diện tích, khối lượng và thời gian", "strandCode": "geometry_and_measurement", "sequence": 6, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Hình học và Đo lường", "objectives": [
+          { "code": "G4.MEASURE.AREA_UNITS", "outcome": "Đọc, đổi và so sánh các đơn vị diện tích phù hợp với phạm vi lớp.", "prerequisites": ["G3.GEO.PERIMETER_AREA"] },
+          { "code": "G4.MEASURE.MASS_TIME", "outcome": "Sử dụng yến, tạ, tấn, giây và thế kỷ trong bài toán quen thuộc.", "prerequisites": ["G3.MEASURE.UNITS", "G3.TIME.CALENDAR"] }
+        ] },
+        { "topicCode": "average", "title": "Tìm số trung bình cộng", "strandCode": "number_and_operations", "sequence": 7, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Toán có lời văn trọng tâm", "objectives": [
+          { "code": "G4.WORDPROBLEM.AVERAGE", "outcome": "Tìm trung bình cộng bằng cách chia tổng các giá trị cho số lượng giá trị.", "prerequisites": ["G3.NUMBER.TO_100000", "G3.DIVIDE.MULTI_DIGIT_BY_ONE"] }
+        ] },
+        { "topicCode": "sum-difference", "title": "Tìm hai số khi biết tổng và hiệu", "strandCode": "number_and_operations", "sequence": 8, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 4 · Toán có lời văn trọng tâm", "objectives": [
+          { "code": "G4.WORDPROBLEM.SUM_DIFFERENCE", "outcome": "Biểu diễn mối quan hệ tổng-hiệu, tìm hai số và kiểm tra lại cả tổng lẫn hiệu.", "prerequisites": ["G2.ADD_SUB.REGROUP"] }
+        ] },
+        { "topicCode": "statistics", "title": "Đọc và lập biểu đồ cột", "strandCode": "statistics_and_probability", "sequence": 9, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 4 · Thống kê và Xác suất", "objectives": [
+          { "code": "G4.DATA.BAR_CHART", "outcome": "Đọc nhãn, đơn vị và vạch chia; mô tả, so sánh hoặc biểu diễn dữ liệu bằng biểu đồ cột đơn giản.", "prerequisites": ["G3.DATA.TABLE"] },
+          { "code": "G4.PROBABILITY.REPEATED_TRIALS", "outcome": "Kiểm đếm số lần một sự kiện xuất hiện qua các lần thử lặp lại.", "prerequisites": ["G3.PROBABILITY.EXPERIMENT"] }
+        ] },
+        { "topicCode": "decimals", "title": "Số thập phân làm quen trước", "strandCode": "number_and_operations", "sequence": 10, "scope": "extension", "appMapping": "mapped", "sourceSection": "Bài học hiện tại ghi là khám phá trước; tài liệu nguồn xếp số thập phân vào lớp 5", "objectives": [
+          { "code": "G4.DECIMAL.PREVIEW", "outcome": "Chỉ dùng làm hoạt động khám phá tùy chọn; không dùng để kết luận học sinh lớp 4 chưa đạt mục tiêu cốt lõi.", "prerequisites": ["G4.NUMBER.MILLIONS"] }
+        ] },
+        { "topicCode": "sequences", "title": "Dãy số cách đều", "strandCode": "number_and_operations", "sequence": 11, "scope": "needs-review", "appMapping": "mapped", "sourceSection": "Bài bổ sung trong web; chưa được xác định là yêu cầu cốt lõi từ tài liệu tham khảo", "objectives": [
+          { "code": "G4.SEQUENCE.ARITHMETIC", "outcome": "Nhận biết quy luật cộng đều trong dãy số ở mức phù hợp; công thức tổng dãy cần được giáo viên duyệt riêng.", "prerequisites": ["G4.NUMBER.MILLIONS"] }
+        ] },
+        { "topicCode": "planting", "title": "Bài toán khoảng cách và trồng cây", "strandCode": "number_and_operations", "sequence": 12, "scope": "needs-review", "appMapping": "mapped", "sourceSection": "Bài bổ sung trong web; cần giáo viên xác nhận phạm vi lớp trước khi cá nhân hóa", "objectives": [
+          { "code": "G4.WORDPROBLEM.INTERVALS", "outcome": "Mô hình hóa số điểm và số khoảng bằng hình vẽ; phân biệt trường hợp có hoặc không tính hai đầu mút.", "prerequisites": ["G4.NUMBER.MILLIONS"] }
+        ] }
+      ]
+    },
+    {
+      "grade": 5,
+      "topics": [
+        { "topicCode": "fractions", "title": "Hỗn số và ôn tập phân số", "strandCode": "number_and_operations", "sequence": 1, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Số và Phép tính; không mở rộng thành bốn phép tính hỗn số", "objectives": [
+          { "code": "G5.FRACTION.MIXED_NUMBER", "outcome": "Giải thích hỗn số bằng mô hình phần nguyên và phân số; đổi qua lại giữa hỗn số và phân số.", "prerequisites": ["G4.FRACTION.EQUIVALENCE"] }
+        ] },
+        { "topicCode": "decimals", "title": "Số thập phân và bốn phép tính", "strandCode": "number_and_operations", "sequence": 2, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Số và Phép tính", "objectives": [
+          { "code": "G5.DECIMAL.PLACE_COMPARE", "outcome": "Đọc, viết, phân tích hàng và so sánh số thập phân; làm tròn theo hàng được yêu cầu.", "prerequisites": ["G4.NUMBER.MILLIONS"] },
+          { "code": "G5.DECIMAL.OPERATIONS", "outcome": "Cộng, trừ, nhân, chia số thập phân; đặt dấu phẩy và kiểm tra tính hợp lý của kết quả.", "prerequisites": ["G5.DECIMAL.PLACE_COMPARE", "G4.MULTIPLY_DIVIDE.MULTI_DIGIT"] }
+        ] },
+        { "topicCode": "percentage", "title": "Tỉ số và tỉ số phần trăm", "strandCode": "number_and_operations", "sequence": 3, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Số và Phép tính", "objectives": [
+          { "code": "G5.PERCENT.RATIO", "outcome": "Diễn giải tỉ số phần trăm và tìm tỉ số phần trăm của hai số.", "prerequisites": ["G5.DECIMAL.OPERATIONS"] },
+          { "code": "G5.PERCENT.VALUE", "outcome": "Tìm giá trị phần trăm của một số bằng cách mô hình hóa các phần trên 100.", "prerequisites": ["G5.PERCENT.RATIO"] }
+        ] },
+        { "topicCode": "ratio", "title": "Tìm hai số khi biết tổng và tỉ số", "strandCode": "number_and_operations", "sequence": 4, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Toán có lời văn trọng tâm", "objectives": [
+          { "code": "G5.WORDPROBLEM.SUM_RATIO", "outcome": "Dùng sơ đồ đoạn thẳng để tìm hai số khi biết tổng và tỉ số.", "prerequisites": ["G4.WORDPROBLEM.SUM_DIFFERENCE"] }
+        ] },
+        { "topicCode": "difference-ratio", "title": "Tìm hai số khi biết hiệu và tỉ số", "strandCode": "number_and_operations", "sequence": 5, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Toán có lời văn trọng tâm", "objectives": [
+          { "code": "G5.WORDPROBLEM.DIFFERENCE_RATIO", "outcome": "Dùng sơ đồ đoạn thẳng để tìm hai số khi biết hiệu và tỉ số, rồi kiểm tra lại dữ kiện.", "prerequisites": ["G5.WORDPROBLEM.SUM_RATIO"] }
+        ] },
+        { "topicCode": "division", "title": "Phép chia với số thập phân", "strandCode": "number_and_operations", "sequence": 6, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Số và Phép tính", "objectives": [
+          { "code": "G5.DIVIDE.DECIMAL", "outcome": "Chia số thập phân và giải thích vì sao có thể nhân cả số bị chia, số chia với cùng một lũy thừa của 10.", "prerequisites": ["G5.DECIMAL.OPERATIONS"] }
+        ] },
+        { "topicCode": "units", "title": "Đơn vị đo diện tích và thể tích", "strandCode": "geometry_and_measurement", "sequence": 7, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 5 · Hình học và Đo lường", "objectives": [
+          { "code": "G5.MEASURE.AREA_VOLUME", "outcome": "Phân biệt đơn vị độ dài, diện tích, thể tích và đổi đơn vị theo đúng bậc 10, 100 hoặc 1 000.", "prerequisites": ["G4.MEASURE.AREA_UNITS"] },
+          { "code": "G5.MEASURE.CAPACITY_VOLUME", "outcome": "Liên hệ 1 dm³ với 1 lít và 1 cm³ với 1 ml trong bài toán phù hợp.", "prerequisites": ["G5.MEASURE.AREA_VOLUME"] }
+        ] },
+        { "topicCode": "motion", "title": "Chuyển động đều", "strandCode": "number_and_operations", "sequence": 8, "scope": "core", "appMapping": "mapped", "sourceSection": "Lớp 5 · Toán có lời văn trọng tâm", "objectives": [
+          { "code": "G5.MOTION.RELATION", "outcome": "Chọn quan hệ quãng đường-vận tốc-thời gian phù hợp và thống nhất đơn vị trước khi tính.", "prerequisites": ["G5.DECIMAL.OPERATIONS", "G2.TIME.READ_5_MINUTES"] }
+        ] },
+        { "topicCode": "geometry-advanced", "title": "Diện tích hình phẳng và thể tích hình khối", "strandCode": "geometry_and_measurement", "sequence": 9, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 5 · Hình học và Đo lường", "objectives": [
+          { "code": "G5.GEO.AREA", "outcome": "Chọn đúng đáy, chiều cao và công thức diện tích tam giác, hình thang hoặc hình tròn theo phạm vi đã học.", "prerequisites": ["G3.GEO.PERIMETER_AREA", "G4.GEO.PARALLELOGRAM_RHOMBUS"] },
+          { "code": "G5.GEO.SOLID_MEASURES", "outcome": "Tính diện tích xung quanh, diện tích toàn phần hoặc thể tích hình hộp chữ nhật và hình lập phương; ghi đúng đơn vị.", "prerequisites": ["G5.MEASURE.AREA_VOLUME"] }
+        ] },
+        { "topicCode": "statistics", "title": "Đọc biểu đồ và mô tả xác suất thực nghiệm", "strandCode": "statistics_and_probability", "sequence": 10, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 5 · Thống kê và Xác suất", "objectives": [
+          { "code": "G5.DATA.CHARTS", "outcome": "Đọc, phân tích và nhận xét dữ liệu trên biểu đồ đoạn thẳng hoặc biểu đồ hình quạt theo câu hỏi.", "prerequisites": ["G4.DATA.BAR_CHART"] },
+          { "code": "G5.PROBABILITY.EXPERIMENTAL", "outcome": "Dùng tỉ số số lần xảy ra trên tổng số lần thử để mô tả xác suất thực nghiệm, không khẳng định chắc chắn kết quả kế tiếp.", "prerequisites": ["G4.PROBABILITY.REPEATED_TRIALS"] }
+        ] },
+        { "topicCode": "measurement", "title": "Thời gian và đại lượng đo", "strandCode": "geometry_and_measurement", "sequence": 11, "scope": "core", "appMapping": "partial", "sourceSection": "Lớp 5 · Hình học và Đo lường", "objectives": [
+          { "code": "G5.TIME.OPERATIONS", "outcome": "Cộng, trừ, nhân, chia số đo thời gian và đổi đơn vị khi cần.", "prerequisites": ["G4.MEASURE.MASS_TIME"] }
+        ] }
+      ]
+    }
+  ],
+  "coverageGaps": [
+    { "grade": 1, "topic": "Hình khối trực quan", "status": "partial_in_geometry_topic", "note": "Cần xác nhận có hoạt động/hình ảnh riêng cho khối lập phương và khối hộp chữ nhật." },
+    { "grade": 2, "topic": "Khả năng xảy ra: chắc chắn, có thể, không thể", "status": "questions_added_visual_activity_needed", "note": "Đã bổ sung câu hỏi phân biệt ba khả năng; còn cần hình minh họa hoặc hoạt động kéo-thả trực quan." },
+    { "grade": 3, "topic": "Xác suất qua trò chơi ngẫu nhiên", "status": "questions_added_interactive_experiment_needed", "note": "Đã bổ sung câu hỏi đọc kết quả thử lặp; còn cần hoạt động để học sinh tự ghi nhận kết quả." },
+    { "grade": 4, "topic": "Xác suất qua thí nghiệm lặp lại", "status": "questions_added_dedicated_lesson_needed", "note": "Đã bổ sung câu hỏi kiểm đếm; nên tách bài học khỏi đọc biểu đồ để theo dõi năng lực riêng." },
+    { "grade": 5, "topic": "Biểu đồ đoạn thẳng và biểu đồ hình quạt", "status": "partial_in_statistics_topic", "note": "Đã bổ sung câu đọc và so sánh dữ liệu; cần thêm câu đọc biểu đồ hình quạt và nhiều dạng biểu đồ đoạn thẳng." },
+    { "grade": 1, "topic": "Phép cộng/trừ trong phạm vi và cách tính", "status": "teacher_review_required", "note": "Đối chiếu nội dung bài đang có với yêu cầu không nhớ trong tài liệu trước khi dùng để đánh giá đạt/chưa đạt." },
+    { "grade": 3, "topic": "Phân số", "status": "source_gap", "note": "Bài hiện có trong web nhưng phần tóm tắt nguồn không nêu rõ mục tiêu lớp 3; cần giáo viên xác nhận trước khi dùng làm lộ trình chuẩn." }
+  ]
+}

@@ -8,6 +8,8 @@ import "dotenv/config";
 import { getPool, sql } from "./db.js";
 import { authenticate, loginUser, loginWithFirebase, loginWithGoogle, registerUser, requireAdmin, requireParent, validateCredentials } from "./auth.js";
 import { sendPasswordResetOtpEmail, sendRegistrationOtpEmail } from "./emailService.js";
+import { syncCurriculumCatalog, syncSupplementalQuestionBank } from "./curriculumCatalog.js";
+import { applyPrerequisiteGates, evaluateLessonMastery, evaluateObjectiveEvidence, selectFocusObjective } from "./masteryEngine.js";
 import bcrypt from "bcrypt";
 
 const app = express();
@@ -17,6 +19,7 @@ const port = Number(process.env.PORT || 4000);
 const uploadsDirectory = fileURLToPath(new URL("./uploads/", import.meta.url));
 const questionBankMigrationPath = fileURLToPath(new URL("./migrations/QuestionBank.sql", import.meta.url));
 const learningPathMigrationPath = fileURLToPath(new URL("./migrations/LearningPath.sql", import.meta.url));
+const learningObjectivesMigrationPath = fileURLToPath(new URL("./migrations/LearningObjectives.sql", import.meta.url));
 const monthlyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/MonthlyAssessment.sql", import.meta.url));
 const weeklyAssessmentMigrationPath = fileURLToPath(new URL("./migrations/WeeklyAssessment.sql", import.meta.url));
 const parentModuleMigrationPath = fileURLToPath(new URL("./migrations/ParentModule.sql", import.meta.url));
@@ -203,6 +206,10 @@ async function ensureLearningPathSchema() {
       const pool = await getPool();
       const migration = await readFile(learningPathMigrationPath, "utf8");
       await pool.request().query(migration);
+      await syncSupplementalQuestionBank(pool, sql);
+      const objectivesMigration = await readFile(learningObjectivesMigrationPath, "utf8");
+      await pool.request().query(objectivesMigration);
+      await syncCurriculumCatalog(pool, sql);
     });
   }
   try {
@@ -211,6 +218,65 @@ async function ensureLearningPathSchema() {
     learningPathSchemaPromise = undefined;
     throw error;
   }
+}
+
+async function getObjectiveMasteredTopicCodes(pool, studentId) {
+  const objectiveResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+    SELECT objective.ObjectiveCode, objective.VerificationStatus,
+           COUNT_BIG(answer.ResultId) AS AttemptCount,
+           COUNT(DISTINCT answer.QuestionId) AS DistinctQuestionCount,
+           COALESCE(SUM(CAST(answer.IsCorrect AS INT)), 0) AS CorrectCount
+    FROM [mk].[Student] student
+    INNER JOIN [mk].[CurriculumObjective] objective ON objective.GradeId <= student.Grade
+    LEFT JOIN [mk].[QuestionLearningObjective] mapping
+      ON mapping.ObjectiveCode = objective.ObjectiveCode AND mapping.MappingStatus = 'approved'
+    LEFT JOIN [mk].[Questions] question ON question.QuestionId = mapping.QuestionId AND question.IsActive = 1
+    LEFT JOIN [mk].[StudentQuestionResults] answer ON answer.QuestionId = question.QuestionId
+      AND answer.StudentId = student.StudentId
+      AND answer.ActivityType IN ('Lesson','Practice')
+      AND answer.CreatedAt >= DATEADD(day, -90, SYSUTCDATETIME())
+    WHERE student.StudentId = @studentId
+    GROUP BY objective.ObjectiveCode, objective.VerificationStatus
+  `);
+  const progress = objectiveResult.recordset.map((row) => ({
+    objectiveCode: row.ObjectiveCode,
+    ...evaluateObjectiveEvidence({
+      attemptCount: row.AttemptCount,
+      correctCount: row.CorrectCount,
+      distinctQuestionCount: row.DistinctQuestionCount,
+      verificationStatus: row.VerificationStatus,
+    }),
+  }));
+  const prerequisiteResult = await pool.request().input("studentId", sql.Int, studentId).query(`
+    SELECT prerequisite.ObjectiveCode, prerequisite.PrerequisiteCode
+    FROM [mk].[Student] student
+    INNER JOIN [mk].[CurriculumObjective] objective ON objective.GradeId <= student.Grade
+    INNER JOIN [mk].[CurriculumObjectivePrerequisite] prerequisite ON prerequisite.ObjectiveCode = objective.ObjectiveCode
+    WHERE student.StudentId = @studentId
+  `);
+  applyPrerequisiteGates(progress, prerequisiteResult.recordset.map((row) => ({
+    objectiveCode: row.ObjectiveCode,
+    prerequisiteCode: row.PrerequisiteCode,
+  })));
+
+  const lessonObjectives = await pool.request().input("studentId", sql.Int, studentId).query(`
+    SELECT topic.TopicCode, objective.ObjectiveCode, objective.Scope
+    FROM [mk].[Student] student
+    INNER JOIN [mk].[Topics] topic ON topic.GradeId = student.Grade
+    INNER JOIN [mk].[Lessons] lesson ON lesson.TopicId = topic.TopicId AND lesson.IsActive = 1
+    INNER JOIN [mk].[LessonObjective] link ON link.LessonId = lesson.LessonId
+    INNER JOIN [mk].[CurriculumObjective] objective ON objective.ObjectiveCode = link.ObjectiveCode
+      AND objective.GradeId = topic.GradeId
+    WHERE student.StudentId = @studentId
+  `);
+  const progressByCode = new Map(progress.map((item) => [item.objectiveCode, item]));
+  const objectivesByTopic = new Map();
+  for (const row of lessonObjectives.recordset) {
+    if (!objectivesByTopic.has(row.TopicCode)) objectivesByTopic.set(row.TopicCode, []);
+    objectivesByTopic.get(row.TopicCode).push({ scope: row.Scope, progress: progressByCode.get(row.ObjectiveCode) });
+  }
+  return [...objectivesByTopic].filter(([, objectives]) => evaluateLessonMastery(objectives).isMastered)
+    .map(([topicCode]) => topicCode);
 }
 
 async function ensureMonthlyAssessmentSchema() {
@@ -397,6 +463,7 @@ function premiumRequired(response, feature) {
   const featureNames = {
     weekly_assessment: "bài kiểm tra năng lực tuần",
     advanced_practice: "bài luyện tập nâng cao",
+    personalized_practice: "bài luyện tập theo mục tiêu cá nhân",
     parent_report: "báo cáo học tập chi tiết và gợi ý hỗ trợ cho phụ huynh",
   };
   const featureName = featureNames[feature] || "tính năng này";
@@ -1019,8 +1086,9 @@ app.post("/api/auth/google", async (request, response) => {
 app.post("/api/auth/firebase", async (request, response) => {
   try {
     const requestedRole = ["Student", "Parent"].includes(request.body?.role) ? request.body.role : undefined;
+    const requestedGrade = request.body?.grade;
     if (requestedRole === "Parent") await ensureParentModuleSchema();
-    return response.json(await loginWithFirebase(request.body?.idToken, requestedRole));
+    return response.json(await loginWithFirebase(request.body?.idToken, requestedRole, requestedGrade));
   }
   catch (error) { return response.status(error.status || 500).json({ message: error.status ? error.message : "Đăng nhập Firebase thất bại.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) }); }
 });
@@ -1074,6 +1142,173 @@ app.get("/api/admin/dashboard", authenticate, requireAdmin, async (_request, res
     });
   } catch (error) {
     return response.status(500).json({ message: "Không thể tải dashboard quản trị.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.get("/api/admin/curriculum-review", authenticate, requireAdmin, async (request, response) => {
+  const rawGrade = request.query.grade;
+  const grade = rawGrade === undefined ? null : Number(rawGrade);
+  if (grade !== null && (!Number.isInteger(grade) || grade < 1 || grade > 5)) {
+    return response.status(400).json({ message: "grade phải là số nguyên từ 1 đến 5." });
+  }
+  try {
+    await ensureLearningPathSchema();
+    const pool = await getPool();
+    const [objectiveResult, mappingResult] = await Promise.all([
+      pool.request().input("grade", sql.TinyInt, grade).query(`
+        SELECT objective.ObjectiveCode, objective.GradeId, objective.TopicTitle, objective.Outcome,
+               objective.Scope, objective.SourceSection, objective.VerificationStatus,
+               lesson.LessonId, lesson.Title AS LessonTitle,
+               COUNT(DISTINCT mapping.QuestionId) AS QuestionCount,
+               COUNT(DISTINCT CASE WHEN mapping.MappingStatus = 'approved' THEN mapping.QuestionId END) AS ApprovedMappingCount,
+               COUNT(DISTINCT CASE WHEN mapping.MappingStatus = 'needs-review' THEN mapping.QuestionId END) AS PendingMappingCount
+        FROM [mk].[CurriculumObjective] objective
+        LEFT JOIN [mk].[LessonObjective] lessonObjective ON lessonObjective.ObjectiveCode = objective.ObjectiveCode
+        LEFT JOIN [mk].[Lessons] lesson ON lesson.LessonId = lessonObjective.LessonId AND lesson.IsActive = 1
+        LEFT JOIN [mk].[QuestionLearningObjective] mapping ON mapping.ObjectiveCode = objective.ObjectiveCode
+        WHERE (@grade IS NULL OR objective.GradeId = @grade)
+        GROUP BY objective.ObjectiveCode, objective.GradeId, objective.TopicTitle, objective.Outcome,
+                 objective.Scope, objective.SourceSection, objective.VerificationStatus, lesson.LessonId, lesson.Title
+        ORDER BY objective.GradeId, objective.TopicTitle, objective.ObjectiveCode
+      `),
+      pool.request().input("grade", sql.TinyInt, grade).query(`
+        SELECT mapping.QuestionId, mapping.ObjectiveCode, mapping.EvidenceNote, mapping.IsPrimary, mapping.MappingStatus,
+               question.QuestionText, question.OptionA, question.OptionB, question.OptionC, question.OptionD,
+               question.CorrectAnswer, question.Explanation, question.Difficulty, objective.GradeId
+        FROM [mk].[QuestionLearningObjective] mapping
+        INNER JOIN [mk].[CurriculumObjective] objective ON objective.ObjectiveCode = mapping.ObjectiveCode
+        INNER JOIN [mk].[Questions] question ON question.QuestionId = mapping.QuestionId
+        WHERE (@grade IS NULL OR objective.GradeId = @grade)
+        ORDER BY objective.GradeId, mapping.ObjectiveCode, question.Difficulty, mapping.QuestionId
+      `),
+    ]);
+    const mappingsByObjective = new Map();
+    for (const row of mappingResult.recordset) {
+      if (!mappingsByObjective.has(row.ObjectiveCode)) mappingsByObjective.set(row.ObjectiveCode, []);
+      mappingsByObjective.get(row.ObjectiveCode).push({
+        questionId: row.QuestionId,
+        questionText: row.QuestionText,
+        options: [row.OptionA, row.OptionB, row.OptionC, row.OptionD],
+        correctAnswer: row.CorrectAnswer,
+        explanation: row.Explanation,
+        difficulty: Number(row.Difficulty),
+        evidenceNote: row.EvidenceNote,
+        isPrimary: Boolean(row.IsPrimary),
+        status: row.MappingStatus,
+      });
+    }
+    const objectives = objectiveResult.recordset.map((row) => ({
+      code: row.ObjectiveCode,
+      grade: Number(row.GradeId),
+      topicTitle: row.TopicTitle,
+      outcome: row.Outcome,
+      scope: row.Scope,
+      sourceSection: row.SourceSection,
+      verificationStatus: row.VerificationStatus,
+      lesson: row.LessonId ? { id: row.LessonId, title: row.LessonTitle } : null,
+      questionCount: Number(row.QuestionCount || 0),
+      approvedMappingCount: Number(row.ApprovedMappingCount || 0),
+      pendingMappingCount: Number(row.PendingMappingCount || 0),
+      personalizationReady: row.VerificationStatus === "teacher-approved"
+        && Number(row.ApprovedMappingCount || 0) >= 3,
+      questions: mappingsByObjective.get(row.ObjectiveCode) || [],
+    }));
+    const summary = objectives.reduce((result, objective) => {
+      result.objectives += 1;
+      result.curriculumPending += objective.verificationStatus === "teacher-approved" ? 0 : 1;
+      result.mappingPending += objective.pendingMappingCount;
+      result.mappingApproved += objective.approvedMappingCount;
+      result.personalizationReady += objective.personalizationReady ? 1 : 0;
+      result.questionCoveragePending += objective.verificationStatus === "teacher-approved" && objective.approvedMappingCount < 3 ? 1 : 0;
+      return result;
+    }, { objectives: 0, curriculumPending: 0, mappingPending: 0, mappingApproved: 0, personalizationReady: 0, questionCoveragePending: 0 });
+    return response.json({ grade, policy: { minimumAttempts: 5, minimumDistinctQuestions: 3, masteryAccuracy: 80, evidenceWindowDays: 90 }, summary, objectives });
+  } catch (error) {
+    return response.status(500).json({ message: "Không thể tải dữ liệu rà soát chương trình.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
+  }
+});
+
+app.patch("/api/admin/curriculum-review/objectives/:code", authenticate, requireAdmin, async (request, response) => {
+  const objectiveCode = String(request.params.code || "");
+  const status = request.body?.verificationStatus;
+  const note = typeof request.body?.note === "string" ? request.body.note.trim() : "";
+  if (!/^[A-Z0-9._-]{1,80}$/.test(objectiveCode)) return response.status(400).json({ message: "Mã mục tiêu không hợp lệ." });
+  if (!["teacher-approved", "needs_teacher_review"].includes(status)) return response.status(400).json({ message: "verificationStatus không hợp lệ." });
+  if (note.length > 500) return response.status(400).json({ message: "Ghi chú rà soát tối đa 500 ký tự." });
+  let transaction;
+  try {
+    await ensureLearningPathSchema();
+    const pool = await getPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const result = await transaction.request()
+      .input("objectiveCode", sql.VarChar(80), objectiveCode)
+      .input("status", sql.VarChar(30), status)
+      .input("reviewerUserId", sql.Int, request.user.userId)
+      .input("note", sql.NVarChar(500), note || null)
+      .query(`
+        DECLARE @previousStatus VARCHAR(30);
+        SELECT @previousStatus = VerificationStatus
+        FROM [mk].[CurriculumObjective] WITH (UPDLOCK, HOLDLOCK)
+        WHERE ObjectiveCode = @objectiveCode;
+        IF @previousStatus IS NULL THROW 51010, 'Không tìm thấy mục tiêu học tập.', 1;
+        UPDATE [mk].[CurriculumObjective]
+        SET VerificationStatus = @status, UpdatedAt = SYSUTCDATETIME()
+        WHERE ObjectiveCode = @objectiveCode;
+        INSERT INTO [mk].[CurriculumReviewAudit] (ReviewerUserId, TargetType, ObjectiveCode, PreviousStatus, NewStatus, Note)
+        VALUES (@reviewerUserId, 'objective', @objectiveCode, @previousStatus, @status, @note);
+        SELECT @previousStatus AS PreviousStatus, @status AS NewStatus;
+      `);
+    await transaction.commit();
+    return response.json({ objectiveCode, verificationStatus: result.recordset[0].NewStatus });
+  } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
+    const statusCode = error.number === 51010 ? 404 : 500;
+    return response.status(statusCode).json({ message: statusCode === 404 ? error.message : "Không thể lưu trạng thái rà soát mục tiêu.", ...(process.env.NODE_ENV !== "production" && statusCode !== 404 ? { detail: error.message } : {}) });
+  }
+});
+
+app.patch("/api/admin/curriculum-review/mappings/:questionId/:objectiveCode", authenticate, requireAdmin, async (request, response) => {
+  const questionId = Number(request.params.questionId);
+  const objectiveCode = String(request.params.objectiveCode || "");
+  const status = request.body?.status;
+  const note = typeof request.body?.note === "string" ? request.body.note.trim() : "";
+  if (!Number.isSafeInteger(questionId) || questionId < 1 || !/^[A-Z0-9._-]{1,80}$/.test(objectiveCode)) {
+    return response.status(400).json({ message: "Câu hỏi hoặc mã mục tiêu không hợp lệ." });
+  }
+  if (!["approved", "needs-review"].includes(status)) return response.status(400).json({ message: "status phải là approved hoặc needs-review." });
+  if (note.length > 500) return response.status(400).json({ message: "Ghi chú rà soát tối đa 500 ký tự." });
+  let transaction;
+  try {
+    await ensureLearningPathSchema();
+    const pool = await getPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    const result = await transaction.request()
+      .input("questionId", sql.Int, questionId)
+      .input("objectiveCode", sql.VarChar(80), objectiveCode)
+      .input("status", sql.VarChar(20), status)
+      .input("reviewerUserId", sql.Int, request.user.userId)
+      .input("note", sql.NVarChar(500), note || null)
+      .query(`
+        DECLARE @previousStatus VARCHAR(20);
+        SELECT @previousStatus = MappingStatus
+        FROM [mk].[QuestionLearningObjective] WITH (UPDLOCK, HOLDLOCK)
+        WHERE QuestionId = @questionId AND ObjectiveCode = @objectiveCode;
+        IF @previousStatus IS NULL THROW 51011, 'Không tìm thấy liên kết câu hỏi-mục tiêu.', 1;
+        UPDATE [mk].[QuestionLearningObjective]
+        SET MappingStatus = @status
+        WHERE QuestionId = @questionId AND ObjectiveCode = @objectiveCode;
+        INSERT INTO [mk].[CurriculumReviewAudit] (ReviewerUserId, TargetType, ObjectiveCode, QuestionId, PreviousStatus, NewStatus, Note)
+        VALUES (@reviewerUserId, 'question-mapping', @objectiveCode, @questionId, @previousStatus, @status, @note);
+        SELECT @previousStatus AS PreviousStatus, @status AS NewStatus;
+      `);
+    await transaction.commit();
+    return response.json({ questionId, objectiveCode, status: result.recordset[0].NewStatus });
+  } catch (error) {
+    if (transaction) await transaction.rollback().catch(() => {});
+    const statusCode = error.number === 51011 ? 404 : 500;
+    return response.status(statusCode).json({ message: statusCode === 404 ? error.message : "Không thể lưu trạng thái rà soát câu hỏi.", ...(process.env.NODE_ENV !== "production" && statusCode !== 404 ? { detail: error.message } : {}) });
   }
 });
 
@@ -1388,28 +1623,29 @@ app.post("/api/payments/:invoice/cancel", authenticate, async (request, response
 });
 
 app.post("/api/students/me/assessment/start", authenticate, async (request, response) => {
-  let gradeInput = Number(request.body?.grade);
   const pool = await getPool();
-  if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5) {
-    // Tự lấy grade từ DB nếu client không truyền
-    const studentResult = await pool.request()
-      .input("userId", sql.Int, request.user.userId)
-      .query("SELECT Grade FROM [mk].[Student] WHERE StudentId = @userId");
-    gradeInput = studentResult.recordset[0]?.Grade ?? 0;
-    if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5)
-      return response.status(400).json({ message: "Lớp cần đánh giá phải từ 1 đến 5. Vui lòng cập nhật hồ sơ trước." });
-  }
+  const studentResult = await pool.request()
+    .input("userId", sql.Int, request.user.userId)
+    .query("SELECT Grade FROM [mk].[Student] WHERE StudentId = @userId");
+  const gradeInput = Number(studentResult.recordset[0]?.Grade || 0);
+  if (!Number.isInteger(gradeInput) || gradeInput < 1 || gradeInput > 5)
+    return response.status(400).json({ message: "Lớp cần đánh giá phải từ 1 đến 5. Vui lòng cập nhật hồ sơ trước." });
   const transaction = new sql.Transaction(pool);
   try {
     const topicsResult = await pool.request().query("SELECT TopicId, TopicCode, TopicName FROM [mk].[Topic]");
     const topicMap = new Map(topicsResult.recordset.map((topic) => [topic.TopicCode, topic]));
     if (assessmentSkills.some((skill) => !topicMap.has(skill.code))) return response.status(503).json({ message: "Thiếu dữ liệu chủ đề toán học. Hãy chạy script MathKidsDB.sql mới nhất." });
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
-    const previousAttempt = await transaction.request().input("studentId", sql.Int, request.user.userId)
-      .query("SELECT TOP 1 AttemptId FROM [mk].[PlacementAttempt] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId AND SubmittedAt IS NOT NULL");
+    const previousAttempt = await transaction.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("grade", sql.TinyInt, gradeInput)
+      .query(`SELECT TOP 1 attempt.AttemptId
+              FROM [mk].[PlacementAttempt] attempt WITH (UPDLOCK, HOLDLOCK)
+              INNER JOIN [mk].[PlacementTest] test ON test.PlacementTestId = attempt.PlacementTestId
+              WHERE attempt.StudentId = @studentId AND test.Grade = @grade AND attempt.SubmittedAt IS NOT NULL`);
     if (previousAttempt.recordset.length) {
       await transaction.rollback();
-      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", message: "Bài kiểm tra đầu vào chỉ được thực hiện một lần. Bạn có thể xem lại điểm và lộ trình học của mình." });
+      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", grade: gradeInput, message: `Em đã hoàn thành bài đánh giá lớp ${gradeInput}. Kết quả vẫn được lưu trong lịch sử.` });
     }
     const testResult = await transaction.request().input("grade", sql.TinyInt, gradeInput)
       .query("INSERT INTO [mk].[PlacementTest] (Title, Grade, IsActive) OUTPUT INSERTED.PlacementTestId VALUES (N'Đánh giá năng lực toán lớp ' + CAST(@grade AS NVARCHAR(1)), @grade, 1)");
@@ -1461,6 +1697,16 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
     const attempt = attemptResult.recordset[0];
     if (!attempt) return response.status(404).json({ message: "Không tìm thấy bài đánh giá." });
     if (attempt.SubmittedAt) return response.status(409).json({ message: "Bài đánh giá này đã được nộp rồi." });
+    const currentGradeResult = await pool.request().input("studentId", sql.Int, request.user.userId)
+      .query("SELECT Grade FROM [mk].[Student] WHERE StudentId = @studentId");
+    const currentGrade = Number(currentGradeResult.recordset[0]?.Grade || 0);
+    if (currentGrade !== Number(attempt.Grade)) {
+      return response.status(409).json({
+        code: "ASSESSMENT_GRADE_CHANGED",
+        grade: currentGrade,
+        message: "Lớp trong hồ sơ đã thay đổi nên bài đánh giá này không còn phù hợp. Hãy tải lại trang và bắt đầu bài đánh giá của lớp hiện tại.",
+      });
+    }
     const questionResult = await pool.request().input("testId", sql.Int, attempt.PlacementTestId)
       .query("SELECT q.QuestionId, q.Prompt, q.AnswerData, t.TopicCode, t.TopicName FROM [mk].[PlacementTestQuestion] ptq JOIN [mk].[Question] q ON q.QuestionId = ptq.QuestionId JOIN [mk].[Topic] t ON t.TopicId = q.TopicId WHERE ptq.PlacementTestId = @testId");
     const supplied = new Map(answers.map((item) => [Number(item.questionId), item.answer.trim()]));
@@ -1484,12 +1730,18 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
     let rewardAlreadyClaimed = false;
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
-    const priorSubmission = await transaction.request().input("studentId", sql.Int, request.user.userId)
+    const priorSubmission = await transaction.request()
+      .input("studentId", sql.Int, request.user.userId)
       .input("attemptId", sql.BigInt, attemptId)
-      .query("SELECT TOP 1 AttemptId FROM [mk].[PlacementAttempt] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @studentId AND SubmittedAt IS NOT NULL AND AttemptId <> @attemptId");
+      .input("grade", sql.TinyInt, attempt.Grade)
+      .query(`SELECT TOP 1 previousAttempt.AttemptId
+              FROM [mk].[PlacementAttempt] previousAttempt WITH (UPDLOCK, HOLDLOCK)
+              INNER JOIN [mk].[PlacementTest] previousTest ON previousTest.PlacementTestId = previousAttempt.PlacementTestId
+              WHERE previousAttempt.StudentId = @studentId AND previousTest.Grade = @grade
+                AND previousAttempt.SubmittedAt IS NOT NULL AND previousAttempt.AttemptId <> @attemptId`);
     if (priorSubmission.recordset.length) {
       await transaction.rollback();
-      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", message: "Bài kiểm tra đầu vào chỉ được thực hiện một lần. Bạn có thể xem lại điểm và lộ trình học của mình." });
+      return response.status(409).json({ code: "ASSESSMENT_ALREADY_COMPLETED", grade: Number(attempt.Grade), message: `Em đã hoàn thành bài đánh giá lớp ${attempt.Grade}. Kết quả vẫn được lưu trong lịch sử.` });
     }
     const claimDate = vietnamDateKey();
     const existingClaim = await transaction.request()
@@ -1573,15 +1825,18 @@ app.get("/api/students/me/assessment/latest", authenticate, async (request, resp
   try {
     const pool = await getPool();
     const result = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
-      SELECT TOP 1 AttemptId, Score, AbilitySummary, SubmittedAt
-      FROM [mk].[PlacementAttempt]
-      WHERE StudentId = @studentId AND SubmittedAt IS NOT NULL
-      ORDER BY SubmittedAt DESC
+      SELECT TOP 1 attempt.AttemptId, attempt.Score, attempt.AbilitySummary, attempt.SubmittedAt,
+             test.Grade AS AssessmentGrade
+      FROM [mk].[PlacementAttempt] attempt
+      INNER JOIN [mk].[PlacementTest] test ON test.PlacementTestId = attempt.PlacementTestId
+      INNER JOIN [mk].[Student] student ON student.StudentId = attempt.StudentId AND student.Grade = test.Grade
+      WHERE attempt.StudentId = @studentId AND attempt.SubmittedAt IS NOT NULL
+      ORDER BY attempt.SubmittedAt DESC
     `);
     const attempt = result.recordset[0];
     let storedSummary = {};
     try { storedSummary = JSON.parse(attempt?.AbilitySummary || "{}"); } catch { storedSummary = {}; }
-    let resultData = attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...storedSummary } : null;
+    let resultData = attempt ? { attemptId: attempt.AttemptId, score: Number(attempt.Score), submittedAt: attempt.SubmittedAt, ...storedSummary, grade: Number(attempt.AssessmentGrade) } : null;
     const isPremium = resultData ? await hasActivePremium(pool, request.user.userId) : false;
     if (resultData && !isPremium) {
       resultData = { ...resultData, isPremium: false, advice: { summary: "Kết quả và bản đồ kỹ năng của con đã được lưu. Nâng cấp Premium để mở phân tích và lộ trình cá nhân hóa.", strengths: [], focus: [], roadmap: [], generatedBy: "System", premiumRequired: true } };
@@ -2092,7 +2347,8 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
         SELECT COUNT_BIG(*) AS AnsweredCount, SUM(CASE WHEN r.IsCorrect = 1 THEN 1 ELSE 0 END) AS CorrectCount
         FROM [mk].[StudentQuestionResults] r
         INNER JOIN [mk].[Questions] q ON q.QuestionId = r.QuestionId
-        WHERE r.StudentId = s.StudentId AND q.TopicId = t.TopicId
+         WHERE r.StudentId = s.StudentId AND q.TopicId = t.TopicId
+           AND r.ActivityType = 'Lesson' AND r.CreatedAt >= DATEADD(day, -30, SYSUTCDATETIME())
       ) stats
       WHERE s.StudentId = @studentId
       ORDER BY l.SortOrder, l.LessonId
@@ -2115,6 +2371,124 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       };
     });
     const studentGrade = Number(result.recordset[0]?.Grade || 0);
+    let objectiveProgress = [];
+    if (studentGrade > 0 && lessons.length) {
+      const objectiveResult = await pool.request().input("grade", sql.TinyInt, studentGrade).query(`
+        SELECT link.LessonId, objective.ObjectiveCode, objective.Outcome, objective.Scope,
+               objective.StrandCode, objective.Sequence, objective.SourceSection,
+               objective.VerificationStatus
+        FROM [mk].[LessonObjective] link
+        INNER JOIN [mk].[CurriculumObjective] objective ON objective.ObjectiveCode = link.ObjectiveCode
+        WHERE objective.GradeId = @grade
+        ORDER BY objective.Sequence, objective.ObjectiveCode
+      `);
+      const contentBlockResult = await pool.request().input("grade", sql.TinyInt, studentGrade).query(`
+        SELECT block.LessonId, block.BlockType, block.BlockOrder, block.Title,
+               block.ContentJson, block.ContentSchemaVersion
+        FROM [mk].[LessonContentBlock] block
+        INNER JOIN [mk].[Lessons] lesson ON lesson.LessonId = block.LessonId
+        INNER JOIN [mk].[Topics] topic ON topic.TopicId = lesson.TopicId
+        WHERE topic.GradeId = @grade AND lesson.IsActive = 1
+        ORDER BY block.LessonId, block.BlockOrder, block.BlockType
+      `);
+      const objectiveEvidenceResult = await pool.request()
+        .input("studentId", sql.Int, request.user.userId)
+        .input("grade", sql.TinyInt, studentGrade)
+        .query(`
+          SELECT objective.ObjectiveCode, objective.GradeId, objective.TopicTitle,
+                 objective.Outcome, objective.Scope, objective.VerificationStatus, COUNT_BIG(result.ResultId) AS AttemptCount,
+                 COALESCE(SUM(CAST(result.IsCorrect AS INT)), 0) AS CorrectCount,
+                 COUNT(DISTINCT result.QuestionId) AS DistinctQuestionCount,
+                 COUNT(DISTINCT question.QuestionId) AS ApprovedQuestionCount,
+                 MAX(result.CreatedAt) AS LastAttemptAt
+          FROM [mk].[CurriculumObjective] objective
+          LEFT JOIN [mk].[QuestionLearningObjective] mapping
+            ON mapping.ObjectiveCode = objective.ObjectiveCode AND mapping.MappingStatus = 'approved'
+          LEFT JOIN [mk].[Questions] question
+            ON question.QuestionId = mapping.QuestionId AND question.IsActive = 1
+          LEFT JOIN [mk].[StudentQuestionResults] result
+            ON result.QuestionId = question.QuestionId
+           AND result.StudentId = @studentId
+           AND result.ActivityType IN ('Lesson','Practice')
+           AND result.CreatedAt >= DATEADD(day, -90, SYSUTCDATETIME())
+          WHERE objective.GradeId <= @grade
+          GROUP BY objective.ObjectiveCode, objective.GradeId, objective.TopicTitle,
+                   objective.Outcome, objective.Scope, objective.VerificationStatus
+          ORDER BY objective.GradeId, objective.TopicTitle, objective.ObjectiveCode
+        `);
+      const allObjectiveProgress = objectiveEvidenceResult.recordset.map((row) => {
+        const evidence = evaluateObjectiveEvidence({
+          attemptCount: row.AttemptCount,
+          correctCount: row.CorrectCount,
+          distinctQuestionCount: row.DistinctQuestionCount,
+          verificationStatus: row.VerificationStatus,
+        });
+        return {
+          objectiveCode: row.ObjectiveCode,
+          grade: Number(row.GradeId),
+          topicTitle: row.TopicTitle,
+          outcome: row.Outcome,
+          scope: row.Scope,
+          ...evidence,
+          approvedQuestionCount: Number(row.ApprovedQuestionCount || 0),
+          lastAttemptAt: row.LastAttemptAt,
+        };
+      });
+      const prerequisiteResult = await pool.request().input("grade", sql.TinyInt, studentGrade).query(`
+        SELECT prerequisite.ObjectiveCode, prerequisite.PrerequisiteCode
+        FROM [mk].[CurriculumObjectivePrerequisite] prerequisite
+        INNER JOIN [mk].[CurriculumObjective] objective ON objective.ObjectiveCode = prerequisite.ObjectiveCode
+        WHERE objective.GradeId <= @grade
+      `);
+      applyPrerequisiteGates(allObjectiveProgress, prerequisiteResult.recordset.map((row) => ({
+        objectiveCode: row.ObjectiveCode,
+        prerequisiteCode: row.PrerequisiteCode,
+      })));
+      const firstEvidenceGrade = Math.max(1, studentGrade - 1);
+      objectiveProgress = allObjectiveProgress.filter((objective) => objective.grade >= firstEvidenceGrade);
+      const objectiveProgressByCode = new Map(objectiveProgress.map((item) => [item.objectiveCode, item]));
+      const objectivesByLesson = new Map();
+      for (const row of objectiveResult.recordset) {
+        if (!objectivesByLesson.has(row.LessonId)) objectivesByLesson.set(row.LessonId, []);
+        objectivesByLesson.get(row.LessonId).push({
+          code: row.ObjectiveCode,
+          outcome: row.Outcome,
+          scope: row.Scope,
+          strandCode: row.StrandCode,
+          sequence: Number(row.Sequence),
+          sourceSection: row.SourceSection,
+          verificationStatus: row.VerificationStatus,
+        });
+      }
+      const contentBlocksByLesson = new Map();
+      for (const row of contentBlockResult.recordset) {
+        if (!contentBlocksByLesson.has(row.LessonId)) contentBlocksByLesson.set(row.LessonId, []);
+        let content = {};
+        try { content = JSON.parse(row.ContentJson); } catch { /* keep malformed legacy data isolated */ }
+        contentBlocksByLesson.get(row.LessonId).push({
+          type: row.BlockType,
+          order: Number(row.BlockOrder),
+          title: row.Title,
+          content,
+          schemaVersion: Number(row.ContentSchemaVersion),
+        });
+      }
+      for (const lesson of lessons) {
+        lesson.learningObjectives = (objectivesByLesson.get(lesson.lessonId) || []).map((objective) => ({
+          ...objective,
+          progress: objectiveProgressByCode.get(objective.code) || null,
+        }));
+        const objectiveMastery = evaluateLessonMastery(lesson.learningObjectives);
+        lesson.isObjectiveMastered = objectiveMastery.isMastered;
+        lesson.hasCompleteObjectiveEvidence = objectiveMastery.hasCompleteEvidence;
+        lesson.coreObjectiveCount = objectiveMastery.coreObjectiveCount;
+        lesson.masteredObjectiveCount = objectiveMastery.masteredObjectiveCount;
+        lesson.needsSupportObjectives = objectiveMastery.needsSupportObjectives.map(({ code, outcome, progress }) => ({
+          code, outcome, status: progress?.evidenceStatus || "support_candidate",
+        }));
+        lesson.contentBlocks = contentBlocksByLesson.get(lesson.lessonId) || [];
+      }
+    }
     const weeklyLevelResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).input("grade", sql.TinyInt, studentGrade).query(`
       SELECT TOP 1 Difficulty, Score FROM [mk].[WeeklyAssessmentAttempt]
       WHERE StudentId = @studentId AND Grade = @grade AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC
@@ -2154,23 +2528,56 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       lesson.weeklyAccuracy = weeklyTopicAccuracy.has(Number(lesson.topic.id)) ? weeklyTopicAccuracy.get(Number(lesson.topic.id)) : null;
       const placementSkill = placementSkillForTopic(lesson.topic.code, studentGrade);
       lesson.placementAccuracy = placementSkill ? placementScores.get(placementSkill) ?? null : null;
-      lesson.isMastered = !lesson.isCompleted && lesson.placementAccuracy !== null && lesson.placementAccuracy >= 80;
-      const relevantAccuracy = lesson.weeklyAccuracy ?? lesson.placementAccuracy;
+      const coreObjectives = lesson.learningObjectives.filter((objective) => objective.scope === "core");
+      const hasCompleteObjectiveEvidence = coreObjectives.length > 0
+        && coreObjectives.every((objective) => objective.progress?.canInformAdaptivePath);
+      const objectiveAttempts = coreObjectives.reduce((sum, objective) => sum + (objective.progress?.attemptCount || 0), 0);
+      const objectiveCorrect = coreObjectives.reduce((sum, objective) => sum + (objective.progress?.correctCount || 0), 0);
+      lesson.objectiveAccuracy = hasCompleteObjectiveEvidence && objectiveAttempts
+        ? Math.round((objectiveCorrect / objectiveAttempts) * 100) : null;
+      const placementMastered = lesson.placementAccuracy !== null && lesson.placementAccuracy >= 80;
+      const objectiveMastered = isPremium && lesson.isObjectiveMastered;
+      lesson.isMastered = !lesson.isCompleted && (objectiveMastered || placementMastered);
+      lesson.masterySource = objectiveMastered ? "approved_objective_evidence"
+        : placementMastered ? "placement_assessment" : null;
+      lesson.practiceAccuracy = lesson.answeredCount >= 3 ? lesson.accuracy : null;
+      const relevantAccuracy = isPremium && lesson.objectiveAccuracy !== null
+        ? lesson.objectiveAccuracy
+        : isPremium && lesson.practiceAccuracy !== null
+          ? lesson.practiceAccuracy
+        : lesson.weeklyAccuracy ?? lesson.placementAccuracy;
       lesson.assessmentAccuracy = relevantAccuracy;
-      lesson.assessmentSource = lesson.weeklyAccuracy !== null ? "Đánh giá tuần" : lesson.placementAccuracy !== null ? "Đánh giá đầu vào" : "";
-      lesson.recommendedDifficulty = relevantAccuracy === null ? recommendedDifficulty
-        : relevantAccuracy >= 80 ? 3 : relevantAccuracy >= 50 ? 2 : 1;
+      lesson.assessmentSource = isPremium && lesson.objectiveAccuracy !== null ? "Mục tiêu học tập đã duyệt"
+        : isPremium && lesson.practiceAccuracy !== null ? "Luyện tập 30 ngày"
+        : lesson.weeklyAccuracy !== null ? "Đánh giá tuần" : lesson.placementAccuracy !== null ? "Đánh giá đầu vào" : "";
+      lesson.recommendedDifficulty = isPremium && hasCompleteObjectiveEvidence
+        ? coreObjectives.some((objective) => objective.progress.evidenceStatus === "support_candidate") ? 1
+          : coreObjectives.every((objective) => objective.progress.evidenceStatus === "mastered") ? 3 : 2
+        : relevantAccuracy === null ? recommendedDifficulty
+          : relevantAccuracy >= 80 ? 3 : relevantAccuracy >= 50 ? 2 : 1;
       lesson.skillStatus = relevantAccuracy === null ? "Chưa có kết quả đánh giá"
-        : relevantAccuracy < 50 ? "Cần củng cố theo kết quả đánh giá"
+        : relevantAccuracy < 50 ? "Cần củng cố thêm"
           : relevantAccuracy >= 80 ? "Đã vững · có thể thử mức cao hơn" : "Đang tiến bộ · tiếp tục luyện";
+      lesson.focusObjective = isPremium ? selectFocusObjective(lesson.learningObjectives) : null;
     }
-    const roadmapResult = isPremium ? await pool.request().input("studentId", sql.Int, request.user.userId).query(`
+    const roadmapResult = isPremium ? await pool.request()
+      .input("studentId", sql.Int, request.user.userId)
+      .input("grade", sql.TinyInt, studentGrade)
+      .query(`
       SELECT TOP 10 lp.GeneratedBy, lp.Reason, item.ItemOrder, topic.TopicCode, topic.TopicName,
              item.PlannedDate, item.Status
       FROM [mk].[LearningPath] lp
       INNER JOIN [mk].[LearningPathItem] item ON item.LearningPathId = lp.LearningPathId
       LEFT JOIN [mk].[Topic] topic ON topic.TopicId = item.TopicId
       WHERE lp.StudentId = @studentId AND lp.Status = 'Active'
+        AND EXISTS (
+          SELECT 1
+          FROM [mk].[Student] currentStudent
+          INNER JOIN [mk].[Lesson] gradeLesson ON gradeLesson.Grade = currentStudent.Grade
+          WHERE currentStudent.StudentId = lp.StudentId
+            AND currentStudent.Grade = @grade
+            AND (gradeLesson.TopicId = item.TopicId OR gradeLesson.LessonId = item.LessonId)
+        )
       ORDER BY item.ItemOrder, item.PlannedDate, item.LearningPathItemId
     `) : { recordset: [] };
     const topicAliases = {
@@ -2221,16 +2628,26 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       grade: Number(result.recordset[0]?.Grade || 0),
       isPremium,
       premiumRequired: !isPremium,
+      placementAssessmentRequired: isPremium && !placementResult.recordset.length,
       recommendedDifficulty,
       difficultyLabel: ["", "Cơ bản", "Trung bình", "Nâng cao"][recommendedDifficulty],
       lessons,
+      objectiveProgress,
       completedCount: lessons.filter((lesson) => lesson.isCompleted).length,
       masteredCount: lessons.filter((lesson) => lesson.isMastered).length,
       recommendedLessonId: recommended?.lessonId || null,
       generatedBy: latestRoadmap?.GeneratedBy || (isPremium ? "Adaptive" : "System"),
       roadmapReason: latestRoadmap?.Reason || "",
       recommendation: recommended
-        ? recommended.weeklyAccuracy !== null && recommended.weeklyAccuracy < 50
+        ? isPremium && recommended.focusObjective
+          ? recommended.focusObjective.status === "support_candidate"
+            ? `Mình cùng củng cố mục tiêu: ${recommended.focusObjective.outcome} Hãy xem lại ví dụ rồi luyện ở mức cơ bản.`
+            : `Con đang tiến bộ ở mục tiêu: ${recommended.focusObjective.outcome} Hãy tiếp tục bài học và luyện thêm nhé.`
+          : isPremium && recommended.practiceAccuracy !== null && recommended.practiceAccuracy < 50
+          ? `Trong 30 ngày qua, con đúng ${recommended.practiceAccuracy}% câu ở ${recommended.topic.name}. Hãy xem lại ví dụ và luyện ở mức cơ bản.`
+          : isPremium && recommended.practiceAccuracy !== null && recommended.practiceAccuracy >= 80
+            ? `Con làm đúng ${recommended.practiceAccuracy}% câu luyện ${recommended.topic.name}; bài tiếp theo sẽ tăng độ thử thách.`
+            : recommended.weeklyAccuracy !== null && recommended.weeklyAccuracy < 50
           ? `Ưu tiên ôn ${recommended.topic.name}: tuần này con đúng ${recommended.weeklyAccuracy}% câu ở chủ đề này.`
           : recommended.placementAccuracy !== null && recommended.placementAccuracy < 50
             ? `Bắt đầu với ${recommended.topic.name}: bài đánh giá đầu vào cho thấy đây là phần con nên củng cố.`
@@ -2261,7 +2678,8 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
     await ensureLearningPathSchema();
     const pool = await getPool();
     let masteredTopicCodes = [];
-    if (await hasActivePremium(pool, request.user.userId)) {
+    const isPremium = await hasActivePremium(pool, request.user.userId);
+    if (isPremium) {
       const placement = await pool.request().input("studentId", sql.Int, request.user.userId).query(`
         SELECT TOP 1 pa.AbilitySummary, pt.Grade
         FROM [mk].[PlacementAttempt] pa
@@ -2276,6 +2694,8 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
           Number(placement.recordset[0]?.Grade || 0),
         );
       } catch { masteredTopicCodes = []; }
+      const objectiveMasteredTopicCodes = await getObjectiveMasteredTopicCodes(pool, request.user.userId);
+      masteredTopicCodes = [...new Set([...masteredTopicCodes, ...objectiveMasteredTopicCodes])];
     }
     transaction = new sql.Transaction(pool);
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -2305,7 +2725,8 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
                    SELECT 1 FROM [mk].[Student] s2 INNER JOIN [mk].[Lessons] blockedLesson ON blockedLesson.LessonId = @lessonId
                    INNER JOIN [mk].[Topics] blockedTopic ON blockedTopic.TopicId = blockedLesson.TopicId AND blockedTopic.GradeId = s2.Grade
                    WHERE s2.StudentId = @studentId
-                 ) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsLocked;
+          ) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsLocked,
+                  CAST(0 AS INT) AS RecentPracticeCount, CAST(0 AS INT) AS RecentCorrectCount;
         ELSE
         BEGIN
           DECLARE @wasCompleted BIT = 0;
@@ -2320,7 +2741,21 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
           SELECT CAST(1 AS BIT) AS IsAvailable, @wasCompleted AS WasCompleted, CompletedAt,
                  (SELECT COUNT(*) FROM [mk].[StudentQuestionResults] results
                   INNER JOIN [mk].[Questions] practiceQuestion ON practiceQuestion.QuestionId = results.QuestionId
-                  WHERE results.StudentId = @studentId AND results.ActivityType = 'Lesson' AND practiceQuestion.TopicId = l.TopicId) AS PracticeCount
+                   WHERE results.StudentId = @studentId AND results.ActivityType = 'Lesson' AND practiceQuestion.TopicId = l.TopicId) AS PracticeCount,
+                  (SELECT COUNT(*) FROM (
+                    SELECT TOP (3) recent.ResultId
+                    FROM [mk].[StudentQuestionResults] recent
+                    INNER JOIN [mk].[Questions] recentQuestion ON recentQuestion.QuestionId = recent.QuestionId
+                    WHERE recent.StudentId = @studentId AND recent.ActivityType = 'Lesson' AND recentQuestion.TopicId = l.TopicId
+                    ORDER BY recent.CreatedAt DESC, recent.ResultId DESC
+                  ) recentAttempts) AS RecentPracticeCount,
+                  (SELECT COALESCE(SUM(CAST(recentAttempts.IsCorrect AS INT)), 0) FROM (
+                    SELECT TOP (3) recent.IsCorrect
+                    FROM [mk].[StudentQuestionResults] recent
+                    INNER JOIN [mk].[Questions] recentQuestion ON recentQuestion.QuestionId = recent.QuestionId
+                    WHERE recent.StudentId = @studentId AND recent.ActivityType = 'Lesson' AND recentQuestion.TopicId = l.TopicId
+                    ORDER BY recent.CreatedAt DESC, recent.ResultId DESC
+                  ) recentAttempts) AS RecentCorrectCount
           FROM [mk].[StudentLessonProgress] progress
           INNER JOIN [mk].[Lessons] l ON l.LessonId = @lessonId
           WHERE progress.StudentId = @studentId AND progress.LessonId = @lessonId;
@@ -2332,9 +2767,13 @@ app.post("/api/learning/lessons/:id/complete", authenticate, async (request, res
       if (progress?.IsLocked) return response.status(409).json({ message: "Hãy hoàn thành các bài học phía trước để mở khóa bài này." });
       return response.status(404).json({ message: "Không tìm thấy bài học của lớp bạn." });
     }
-    if (!progress.WasCompleted && Number(progress.PracticeCount || 0) < 3) {
+    if (!progress.WasCompleted && Number(progress.RecentPracticeCount || 0) < 3) {
       await transaction.rollback();
       return response.status(409).json({ message: "Em cần đọc lý thuyết, xem ví dụ và hoàn thành 3 câu tự luyện trước khi đánh dấu bài học." });
+    }
+    if (!progress.WasCompleted && Number(progress.RecentCorrectCount || 0) < 2) {
+      await transaction.rollback();
+      return response.status(409).json({ message: "Em cần xem lại phần giải thích và trả lời đúng ít nhất 2 trong 3 câu luyện gần nhất để hoàn thành bài." });
     }
     await transaction.commit();
     return response.json({ message: progress.WasCompleted ? "Bài học này đã được hoàn thành trước đó." : "Đã lưu bài học hoàn thành!", isCompleted: true, completedAt: progress.CompletedAt });
@@ -2368,7 +2807,13 @@ app.get("/api/questions/topics", authenticate, async (request, response) => {
 
 app.get("/api/questions", authenticate, async (request, response) => {
   try {
-    await ensureQuestionBankSchema();
+    const rawObjectiveCode = request.query.objectiveCode;
+    const objectiveCode = rawObjectiveCode === undefined ? null : String(rawObjectiveCode).trim();
+    if (objectiveCode !== null && !/^[A-Z0-9._-]{1,80}$/.test(objectiveCode)) {
+      return response.status(400).json({ message: "objectiveCode không hợp lệ." });
+    }
+    if (objectiveCode) await ensureLearningPathSchema();
+    else await ensureQuestionBankSchema();
     const pool = await getPool();
     const rawGrade = request.query.grade;
     let grade;
@@ -2392,8 +2837,22 @@ app.get("/api/questions", authenticate, async (request, response) => {
     if (difficulty !== null && (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 3)) {
       return response.status(400).json({ message: "difficulty phải là 1 (Easy), 2 (Medium) hoặc 3 (Hard)." });
     }
-    if (difficulty > 1 && activity !== "Game" && !await hasActivePremium(pool, request.user.userId)) return premiumRequired(response, "advanced_practice");
-    const effectiveDifficulty = activity === "Game" ? difficulty : difficulty ?? 1;
+    const rawMixedDifficulty = request.query.mixedDifficulty;
+    if (rawMixedDifficulty !== undefined && !["true", "false"].includes(String(rawMixedDifficulty))) {
+      return response.status(400).json({ message: "mixedDifficulty phải là true hoặc false." });
+    }
+    const mixedDifficulty = rawMixedDifficulty === "true";
+    if (mixedDifficulty && difficulty !== null) {
+      return response.status(400).json({ message: "Không truyền đồng thời difficulty và mixedDifficulty." });
+    }
+    const isPremium = (difficulty > 1 || objectiveCode || mixedDifficulty)
+      ? await hasActivePremium(pool, request.user.userId)
+      : false;
+    if (difficulty > 1 && activity !== "Game" && !isPremium) return premiumRequired(response, "advanced_practice");
+    if (objectiveCode && !isPremium) return premiumRequired(response, "personalized_practice");
+    const effectiveDifficulty = activity === "Game" ? difficulty
+      : objectiveCode && difficulty === null ? null : difficulty ?? 1;
+    const practiceDifficulty = mixedDifficulty ? (isPremium ? null : 1) : effectiveDifficulty;
     const rawCount = request.query.count;
     const count = rawCount === undefined ? 10 : Number(rawCount);
     if (!Number.isInteger(count) || count < 1 || count > 50) return response.status(400).json({ message: "count phải là số nguyên từ 1 đến 50." });
@@ -2401,7 +2860,8 @@ app.get("/api/questions", authenticate, async (request, response) => {
     const result = await pool.request()
       .input("grade", sql.TinyInt, grade)
       .input("topic", sql.VarChar(50), topic)
-      .input("difficulty", sql.TinyInt, effectiveDifficulty)
+      .input("objectiveCode", sql.VarChar(80), objectiveCode)
+      .input("difficulty", sql.TinyInt, practiceDifficulty)
       .input("count", sql.Int, count)
       .query(`SELECT TOP (@count) q.QuestionId, t.GradeId, t.TopicCode, t.Name AS TopicName,
                      q.QuestionText, q.OptionA, q.OptionB, q.OptionC, q.OptionD, q.Difficulty
@@ -2410,9 +2870,21 @@ app.get("/api/questions", authenticate, async (request, response) => {
               WHERE t.GradeId = @grade AND q.IsActive = 1
                 AND (@topic IS NULL OR t.TopicCode = @topic)
                 AND (@difficulty IS NULL OR q.Difficulty = @difficulty)
+                AND (@objectiveCode IS NULL OR EXISTS (
+                  SELECT 1
+                  FROM [mk].[QuestionLearningObjective] questionObjective
+                  INNER JOIN [mk].[CurriculumObjective] objective
+                    ON objective.ObjectiveCode = questionObjective.ObjectiveCode
+                  WHERE questionObjective.QuestionId = q.QuestionId
+                    AND questionObjective.ObjectiveCode = @objectiveCode
+                    AND questionObjective.MappingStatus = 'approved'
+                    AND objective.VerificationStatus = 'teacher-approved'
+                    AND objective.GradeId = t.GradeId
+                    AND (objective.TopicCode IS NULL OR objective.TopicCode = t.TopicCode)
+                ))
               ORDER BY NEWID()`);
     return response.json({
-      grade, topic, difficulty, count: result.recordset.length,
+      grade, topic, objectiveCode, difficulty, count: result.recordset.length,
       questions: result.recordset.map((row) => ({
         questionId: row.QuestionId,
         grade: Number(row.GradeId),
@@ -2483,7 +2955,10 @@ app.post("/api/questions/:id/answer", authenticate, async (request, response) =>
       await transaction.rollback();
       return response.status(404).json({ message: "Không tìm thấy câu hỏi đang hoạt động." });
     }
-    if (Number(question.Difficulty) > 1 && activityType !== "Game" && !await hasActivePremium(pool, request.user.userId)) {
+    // Use the transaction's connection for the Premium check. The configured SQL
+    // pool may have max=1, so a separate pool.request() here would wait on the
+    // connection already held by this transaction and time out.
+    if (Number(question.Difficulty) > 1 && activityType !== "Game" && !await hasActivePremium(transaction, request.user.userId)) {
       await transaction.rollback();
       return premiumRequired(response, "advanced_practice");
     }
@@ -3067,6 +3542,15 @@ app.patch("/api/students/me/profile", authenticate, async (request, response) =>
   const transaction = new sql.Transaction(await getPool());
   try {
     await transaction.begin();
+    const currentStudentResult = await transaction.request().input("userId", sql.Int, request.user.userId).query(`
+      SELECT Grade FROM [mk].[Student] WITH (UPDLOCK, HOLDLOCK) WHERE StudentId = @userId
+    `);
+    const previousGrade = Number(currentStudentResult.recordset[0]?.Grade || 0);
+    if (!previousGrade) {
+      await transaction.rollback();
+      return response.status(404).json({ message: "Không tìm thấy hồ sơ học sinh." });
+    }
+    const gradeChanged = previousGrade !== numericGrade;
     await transaction.request()
       .input("userId", sql.Int, request.user.userId)
       .input("name", sql.NVarChar(120), name.trim())
@@ -3078,6 +3562,15 @@ app.patch("/api/students/me/profile", authenticate, async (request, response) =>
       .input("dateOfBirth", sql.Date, dateOfBirth || null)
       .input("avatarUrl", sql.NVarChar(500), avatarUrl || null)
       .query("UPDATE [mk].[Student] SET Grade = @grade, DateOfBirth = @dateOfBirth, AvatarUrl = @avatarUrl WHERE StudentId = @userId");
+    if (gradeChanged) {
+      await transaction.request().input("userId", sql.Int, request.user.userId).query(`
+        UPDATE [mk].[LearningPath]
+        SET Status = 'Archived',
+            EndDate = CASE WHEN StartDate > CAST(SYSUTCDATETIME() AS DATE)
+              THEN StartDate ELSE CAST(SYSUTCDATETIME() AS DATE) END
+        WHERE StudentId = @userId AND Status = 'Active'
+      `);
+    }
     const result = await transaction.request().input("userId", sql.Int, request.user.userId).query(`
       SELECT u.UserId, u.Email, u.DisplayName, u.UserRole,
              s.DateOfBirth, s.Grade, s.AvatarUrl, s.TotalXp, s.TotalStars
@@ -3086,7 +3579,7 @@ app.patch("/api/students/me/profile", authenticate, async (request, response) =>
     `);
     await transaction.commit();
     const row = result.recordset[0];
-    return response.json({ message: "Đã cập nhật hồ sơ.", profile: {
+    return response.json({ message: "Đã cập nhật hồ sơ.", gradeChanged, profile: {
       id: row.UserId, name: row.DisplayName, email: row.Email, role: row.UserRole,
       dateOfBirth: row.DateOfBirth ? row.DateOfBirth.toISOString().slice(0, 10) : "",
       grade: row.Grade, avatarUrl: row.AvatarUrl || "", totalXp: row.TotalXp, totalStars: row.TotalStars,
@@ -3396,8 +3889,14 @@ app.get("/api/parents/me/children/:studentId/report", authenticate, requireParen
         ORDER BY WeekStart DESC`),
       pool.request().input("studentId", sql.Int, studentId).query(`
         SELECT
-          (SELECT TOP 1 Score FROM [mk].[PlacementAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY SubmittedAt DESC) AS PlacementScore,
-          (SELECT TOP 1 SubmittedAt FROM [mk].[PlacementAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY SubmittedAt DESC) AS PlacementAt,
+          (SELECT TOP 1 pa.Score FROM [mk].[PlacementAttempt] pa
+           INNER JOIN [mk].[PlacementTest] pt ON pt.PlacementTestId = pa.PlacementTestId
+           INNER JOIN [mk].[Student] s ON s.StudentId = pa.StudentId AND s.Grade = pt.Grade
+           WHERE pa.StudentId=@studentId AND pa.SubmittedAt IS NOT NULL ORDER BY pa.SubmittedAt DESC) AS PlacementScore,
+          (SELECT TOP 1 pa.SubmittedAt FROM [mk].[PlacementAttempt] pa
+           INNER JOIN [mk].[PlacementTest] pt ON pt.PlacementTestId = pa.PlacementTestId
+           INNER JOIN [mk].[Student] s ON s.StudentId = pa.StudentId AND s.Grade = pt.Grade
+           WHERE pa.StudentId=@studentId AND pa.SubmittedAt IS NOT NULL ORDER BY pa.SubmittedAt DESC) AS PlacementAt,
           (SELECT TOP 1 Score FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyScore,
           (SELECT TOP 1 SubmittedAt FROM [mk].[WeeklyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY WeekStart DESC) AS LastWeeklyAt,
           (SELECT TOP 1 Score FROM [mk].[MonthlyAssessmentAttempt] WHERE StudentId=@studentId AND SubmittedAt IS NOT NULL ORDER BY TestMonth DESC) AS LastMonthlyScore,

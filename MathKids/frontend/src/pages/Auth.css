@@ -29,6 +29,7 @@
 .auth-home-link:hover { color: var(--purple); }
 .google-button-host{height:44px;overflow:hidden;padding:0;background:#fff}.google-button-host>div{width:100%!important}.google-button:disabled{cursor:wait;opacity:.7}
 .firebase-auth-options{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:10px;font-size:12px}.firebase-resend{display:block;margin:0 0 14px;font-size:12px}
+.firebase-config-note{max-width:390px;color:#9a7428;text-align:center;font-size:10px;line-height:1.5}
 
 /* ── Role selector (trang đăng ký) ── */
 .role-selector { display: flex; flex-direction: column; gap: 8px; }

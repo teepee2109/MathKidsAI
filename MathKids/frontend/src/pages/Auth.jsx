@@ -53,8 +53,8 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [googleReady, setGoogleReady] = useState(false);
     const googleButtonRef = useRef(null);
-    // Email/password handled by Firebase instead of the app's own email + OTP flow.
-    const [firebaseEmail, setFirebaseEmail] = useState(false);
+    // Prefer Firebase email/password when configured; retain the legacy OTP flow as an explicit fallback.
+    const [firebaseEmail, setFirebaseEmail] = useState(initialMode === "register" || isFirebaseAuthConfigured);
     const [firebaseVerificationPending, setFirebaseVerificationPending] = useState(false);
 
     useEffect(() => {
@@ -72,6 +72,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             body: JSON.stringify({
                 idToken,
                 ...(isRegister ? { role: registerRole } : {}),
+                ...(isRegister && registerRole === "Student" ? { grade: Number(registerGrade) } : {}),
             }),
         });
         const data = await response.json().catch(() => ({}));
@@ -84,6 +85,9 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
     }
 
     async function handleFirebaseEmailSubmit() {
+        if (!isFirebaseAuthConfigured) {
+            throw new Error("Firebase Authentication chưa được cấu hình cho website này. Hãy thêm cấu hình Firebase hoặc chọn phương thức email OTP thay thế.");
+        }
         const email = values.email.trim();
         if (forgotPassword) {
             await sendFirebasePasswordReset(email);
@@ -201,6 +205,9 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
     function switchMode(nextMode) {
         setMode(nextMode);
+        setFirebaseEmail(nextMode === "register" || isFirebaseAuthConfigured);
+        setFirebaseVerificationPending(false);
+        signOutFirebase().catch(() => {});
 
         navigate(
             nextMode === "register"
@@ -421,7 +428,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
             console.error("Auth error:", error);
 
             setError(
-                error instanceof TypeError && (forgotPassword || (isRegister && !otpSent))
+                error instanceof TypeError && !firebaseEmail && (forgotPassword || (isRegister && !otpSent))
                     ? "Kết nối với backend bị ngắt. Yêu cầu OTP có thể đã được xử lý; hãy kiểm tra email và Spam trước, rồi chờ 60 giây trước khi gửi lại."
                     : getFirebaseAuthErrorMessage(error, "Không thể kết nối tới máy chủ.")
             );
@@ -566,7 +573,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                             {forgotPassword
                                 ? firebaseEmail ? "Nhận liên kết qua email để tạo mật khẩu Firebase mới." : "Nhận mã OTP qua email để tạo mật khẩu mới."
                                 : firebaseEmail
-                                ? "Bạn đang dùng email & mật khẩu của Firebase."
+                                ? isRegister ? "Tạo tài khoản bằng Firebase và xác minh qua liên kết email — không cần OTP MathKids." : "Đăng nhập bằng email & mật khẩu Firebase."
                                 : isRegister
                                 ? "Tạo tài khoản để bắt đầu học Toán thật vui."
                                 : "Tiếp tục hành trình chinh phục Toán học của bạn."}
@@ -945,7 +952,7 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
                             {isSubmitting
                                 ? "Đang xử lý..."
                                 : firebaseEmail
-                                    ? forgotPassword ? "Gửi liên kết đặt lại" : isRegister ? firebaseVerificationPending ? "Tôi đã xác minh email" : "Tạo tài khoản" : "Đăng nhập"
+                                    ? forgotPassword ? "Gửi liên kết đặt lại" : isRegister ? firebaseVerificationPending ? "Tôi đã xác minh email" : "Tạo tài khoản Firebase" : "Đăng nhập Firebase"
                                 : forgotPassword
                                     ? otpSent ? "Đổi mật khẩu" : otpCooldownSeconds > 0 ? `Gửi lại sau ${otpCooldownLabel}` : "Gửi mã OTP"
                                     : isRegister
@@ -966,10 +973,11 @@ export default function Auth({ initialMode = "login", onAuthenticated }) {
 
                     {!forgotPassword && (googleClientId && googleReady ? <div className="google-button google-button-host" ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button className="google-button" type="button" onClick={handleGoogleLogin} disabled={isSubmitting}><span className="google-icon">G</span>{googleClientId ? "Google" : "Google (chưa cấu hình)"}</button>)}
 
-                    {!forgotPassword && isFirebaseAuthConfigured && <div className="firebase-auth-options">
+                    {!forgotPassword && <div className="firebase-auth-options">
                         <button type="button" className="link-button" onClick={toggleFirebaseEmail} disabled={isSubmitting}>
-                            {firebaseEmail ? "← Dùng email & mã OTP của MathKids" : "Dùng email & mật khẩu Firebase"}
+                            {firebaseEmail ? (isRegister ? "← Dùng đăng ký email bằng OTP" : "← Dùng đăng nhập tài khoản MathKids cũ") : isFirebaseAuthConfigured ? "Dùng email & mật khẩu Firebase" : "Chuyển về Firebase (cần cấu hình)"}
                         </button>
+                        {firebaseEmail && !isFirebaseAuthConfigured && <small className="firebase-config-note" role="note">Firebase chưa được cấu hình trong môi trường này. Hãy thêm cấu hình Firebase Web ở frontend và FIREBASE_PROJECT_ID ở backend, hoặc chủ động chọn đăng ký email OTP.</small>}
                     </div>}
 
                     {/* TERMS */}

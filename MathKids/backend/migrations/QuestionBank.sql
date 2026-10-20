@@ -112,8 +112,8 @@ FROM (VALUES
 
   (2,'addition',N'24 + 18 = ?',N'40',N'42',N'44',N'46','B',1,N'24 cộng 18 bằng 42.'),
   (2,'addition',N'65 + 27 = ?',N'82',N'90',N'92',N'94','C',2,N'65 cộng 27 bằng 92.'),
-  (2,'subtraction',N'100 − 37 = ?',N'63',N'67',N'73',N'57','A',2,N'100 trừ 37 bằng 63.'),
-  (2,'subtraction',N'84 − 29 = ?',N'55',N'56',N'65',N'53','A',3,N'84 trừ 29 bằng 55.'),
+  (2,'addition',N'100 − 37 = ?',N'63',N'67',N'73',N'57','A',2,N'100 trừ 37 bằng 63.'),
+  (2,'addition',N'84 − 29 = ?',N'55',N'56',N'65',N'53','A',3,N'84 trừ 29 bằng 55.'),
   (2,'multiplication',N'2 × 6 = ?',N'10',N'12',N'14',N'16','B',1,N'2 nhân 6 bằng 12.'),
   (2,'multiplication',N'5 × 8 = ?',N'35',N'40',N'45',N'48','B',1,N'5 nhân 8 bằng 40.'),
   (2,'multiplication',N'7 × 6 = ?',N'36',N'42',N'48',N'49','B',2,N'7 nhân 6 bằng 42.'),
@@ -157,7 +157,9 @@ FROM (VALUES
 JOIN [mk].[Topics] t ON t.GradeId = seed.GradeId AND t.TopicCode = seed.TopicCode
 WHERE NOT EXISTS (
   SELECT 1 FROM [mk].[Questions] existing
-  WHERE existing.TopicId = t.TopicId AND existing.QuestionText = seed.QuestionText
+  WHERE existing.TopicId = t.TopicId
+    AND DATALENGTH(existing.QuestionText) = DATALENGTH(seed.QuestionText)
+    AND existing.QuestionText COLLATE Latin1_General_100_BIN2 = seed.QuestionText COLLATE Latin1_General_100_BIN2
 );
 
 -- Ensure each lesson topic has at least three beginner questions for a practice set.
@@ -223,7 +225,9 @@ FROM (VALUES
 JOIN [mk].[Topics] t ON t.GradeId = seed.GradeId AND t.TopicCode = seed.TopicCode
 WHERE NOT EXISTS (
   SELECT 1 FROM [mk].[Questions] existing
-  WHERE existing.TopicId = t.TopicId AND existing.QuestionText = seed.QuestionText
+  WHERE existing.TopicId = t.TopicId
+    AND DATALENGTH(existing.QuestionText) = DATALENGTH(seed.QuestionText)
+    AND existing.QuestionText COLLATE Latin1_General_100_BIN2 = seed.QuestionText COLLATE Latin1_General_100_BIN2
 );
 
 INSERT INTO [mk].[Questions]
@@ -251,5 +255,7 @@ FROM (VALUES
 JOIN [mk].[Topics] t ON t.GradeId = seed.GradeId AND t.TopicCode = seed.TopicCode
 WHERE NOT EXISTS (
   SELECT 1 FROM [mk].[Questions] existing
-  WHERE existing.TopicId = t.TopicId AND existing.QuestionText = seed.QuestionText
+  WHERE existing.TopicId = t.TopicId
+    AND DATALENGTH(existing.QuestionText) = DATALENGTH(seed.QuestionText)
+    AND existing.QuestionText COLLATE Latin1_General_100_BIN2 = seed.QuestionText COLLATE Latin1_General_100_BIN2
 );
