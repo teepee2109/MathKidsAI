@@ -123,6 +123,136 @@ export function ElementaryLessonVisual({ topic, title = "", grade = 1 }) {
   </figure>;
 }
 
+const storyObjects = [
+  { words: ["táo", "cam"], icon: "🍎", name: "quả" },
+  { words: ["bánh", "bữa"], icon: "🧁", name: "chiếc bánh" },
+  { words: ["kẹo", "túi"], icon: "🍬", name: "viên kẹo" },
+  { words: ["hoa", "bông"], icon: "🌼", name: "bông hoa" },
+  { words: ["bút", "nhãn vở"], icon: "✏️", name: "chiếc bút" },
+  { words: ["sách", "quyển"], icon: "📚", name: "quyển sách" },
+  { words: ["vỏ sò"], icon: "🐚", name: "vỏ sò" },
+  { words: ["lá"], icon: "🍃", name: "chiếc lá" },
+  { words: ["ghế"], icon: "🪑", name: "chiếc ghế" },
+  { words: ["đĩa"], icon: "🍽️", name: "chiếc đĩa" },
+  { words: ["bi"], icon: "🔵", name: "viên bi" },
+  { words: ["bóng"], icon: "⚽", name: "quả bóng" },
+  { words: ["chim"], icon: "🐦", name: "con chim" },
+  { words: ["cá"], icon: "🐟", name: "con cá" },
+  { words: ["khối", "que tính"], icon: "🧱", name: "khối" },
+];
+
+function getSmallPromptNumbers(text) {
+  const matches = String(text || "").match(/\d+(?:[ .]\d{3})*(?:,\d+)?/g) || [];
+  const numbers = matches.map((value) => Number(value.replace(/[ .]/g, "").replace(",", ".")));
+  return numbers.length === 2 && numbers.every((value) => Number.isInteger(value) && value > 0 && value <= 100)
+    ? numbers : null;
+}
+
+/** A picture cue for early readers; it shows quantities from the story, never the answer. */
+export function EarlyPracticeIllustration({ topic, questionText }) {
+  const supportedTopics = ["addition", "subtraction", "multiplication", "division", "word-problems", "geometry", "measurement", "time"];
+  if (!supportedTopics.includes(topic)) return null;
+
+  const prompt = String(questionText || "");
+  const lowerPrompt = prompt.toLocaleLowerCase("vi-VN");
+  if (topic === "geometry") {
+    const spatialScene = lowerPrompt.includes("ngồi giữa")
+      ? <div className="early-practice-position"><span>👧 Bình</span><b>↔</b><strong>🧒 An</strong><b>↔</b><span>👦 Chi</span></div>
+      : lowerPrompt.includes("dưới bàn")
+        ? <div className="early-practice-position is-vertical"><span>🪑 Mặt bàn</span><b>⬇</b><strong>⚽ Quả bóng</strong></div>
+        : lowerPrompt.includes("tay trái")
+          ? <div className="early-practice-position"><b>⬅ Tay trái</b><strong>🧍 Em</strong><span>Phía trước 👀</span></div>
+          : null;
+    const solids = /khối|lon nước|hộp quà/.test(lowerPrompt);
+    const cards = solids ? [["⚽", "Khối cầu"], ["🥫", "Khối trụ"], ["🎁", "Khối hộp"]]
+      : [["⚽", "Hình tròn"], ["🔺", "Tam giác"], ["🟩", "Hình vuông"], ["📖", "Chữ nhật"]];
+    return <figure className="early-practice-illustration is-geometry">
+      <figcaption><span aria-hidden="true">🔷</span> {spatialScene ? "Hình dung vị trí" : "Nhìn đặc điểm của hình"}</figcaption>
+      {spatialScene || <div className="early-practice-shapes" aria-label={solids ? "Khối cầu, khối trụ, khối hộp" : "Hình tròn, tam giác, hình vuông và hình chữ nhật"}>
+        {cards.map(([icon, label]) => <span key={label}><b aria-hidden="true">{icon}</b><small>{label}</small></span>)}
+      </div>}
+      <small className="early-practice-hint">{spatialScene ? "Quan sát vị trí của từng vật trước khi chọn." : "Đếm cạnh, góc hoặc quan sát đường cong để chọn hình phù hợp."}</small>
+    </figure>;
+  }
+  if (topic === "time") {
+    if (!/kim giờ|kim phút/.test(lowerPrompt)) return null;
+    const hour = Number(lowerPrompt.match(/kim giờ(?: vừa qua)?(?: chỉ)?(?: số)?\s*(\d{1,2})/)?.[1] || 4) % 12;
+    const minuteMark = Number(lowerPrompt.match(/kim phút(?: chỉ)?(?: số)?\s*(\d{1,2})/)?.[1] || 12) % 12;
+    const minutes = minuteMark * 5;
+    return <figure className="early-practice-illustration is-time">
+      <figcaption><span aria-hidden="true">🕒</span> Quan sát hai kim đồng hồ</figcaption>
+      <div className="early-practice-clock-face" role="img" aria-label={`Mặt đồng hồ minh họa, kim giờ gần số ${hour || 12} và kim phút ở vạch ${minutes} phút`}>
+        {Array.from({ length: 12 }, (_, index) => <i key={index} style={{ "--clock-index": index }} />)}
+        <span className="elementary-clock-hour" style={{ transform: `rotate(${hour * 30 + minutes * 0.5}deg)` }} />
+        <span className="elementary-clock-minute" style={{ transform: `rotate(${minutes * 6}deg)` }} />
+      </div>
+      <small className="early-practice-hint">Kim ngắn chỉ giờ · kim dài chỉ phút.</small>
+    </figure>;
+  }
+  const numbers = getSmallPromptNumbers(prompt);
+  if (!numbers) return null;
+  if (topic === "measurement") {
+    if (!/dài hơn|ngắn hơn|vật nào dài|so sánh độ dài/.test(lowerPrompt)) return null;
+    const [first, second] = numbers;
+    return <figure className="early-practice-illustration is-measurement">
+      <figcaption><span aria-hidden="true">📏</span> So sánh độ dài bằng hình</figcaption>
+      <div className="early-practice-measure-bars">{[first, second].map((length, index) => <div key={`${length}-${index}`}><small>{index === 0 ? "Vật thứ nhất" : "Vật thứ hai"} · {length}</small><span style={{ "--measure-width": `${Math.max(24, Math.min(260, length * 5))}px` }} /><i>{Array.from({ length: Math.min(length, 12) + 1 }, (_, tick) => <b key={tick}>{tick === 0 || tick === Math.min(length, 12) ? tick : ""}</b>)}</i></div>)}</div>
+      <small className="early-practice-hint">Đặt hai đầu cùng vạch 0 rồi so sánh vạch cuối.</small>
+    </figure>;
+  }
+  let operation = topic;
+  if (topic === "word-problems") {
+    if (/chia đều|chia mỗi|xếp.*mỗi|chia thành/.test(lowerPrompt)) operation = "division";
+    else if (/mỗi nhóm|mỗi bạn|mỗi bàn|mỗi đĩa|mỗi hàng/.test(lowerPrompt)) operation = "multiplication";
+    else if (/còn lại|bay đi|cho bạn|bớt|nhiều hơn|ít hơn/.test(lowerPrompt)) operation = "subtraction";
+    else if (/thêm|tất cả|cả hai|gộp/.test(lowerPrompt)) operation = "addition";
+    else return null;
+  }
+  if (operation === "multiplication" && !/mỗi|nhóm|hàng|đĩa|túi|bàn/.test(lowerPrompt)) return null;
+
+  const object = storyObjects.find((candidate) => candidate.words.some((word) => lowerPrompt.includes(word))) || { icon: "⭐", name: "ngôi sao" };
+  const [first, second] = numbers;
+  const renderObjects = (count, crossed = 0) => {
+    if (count > 12) {
+      const tens = Math.floor(count / 10);
+      const ones = count % 10;
+      return <><span className="early-practice-bundle" aria-hidden="true">🧺 × {tens} bó 10</span>{Array.from({ length: ones }, (_, index) => <span key={index} className="is-loose" aria-hidden="true">{object.icon}</span>)}{crossed > 0 && <small className="early-practice-cross-note">Lấy đi {crossed}</small>}</>;
+    }
+    return Array.from({ length: count }, (_, index) =>
+      <span key={index} className={index < crossed ? "is-crossed" : ""} aria-hidden="true">{object.icon}</span>);
+  };
+
+  let scene;
+  if (operation === "multiplication" && first <= 6 && second <= 6) {
+    scene = <div className="early-practice-array" aria-label={`${first} nhóm, mỗi nhóm ${second} ${object.name}`}>
+      {Array.from({ length: first }, (_, groupIndex) => <div className="early-practice-basket" key={groupIndex}>
+        {renderObjects(second)}<small>Nhóm {groupIndex + 1}</small>
+      </div>)}
+    </div>;
+  } else if (operation === "division") {
+    scene = <div className="early-practice-sharing" aria-label={`${first} ${object.name} cần chia cho ${second} bạn hoặc nhóm`}>
+      <div className="early-practice-pile">{renderObjects(first)}<small>{first} {object.name}</small></div>
+      <b aria-hidden="true">→</b>
+      <div className="early-practice-recipients">{Array.from({ length: second }, (_, index) => <span key={index} aria-hidden="true">🧺</span>)}<small>Chia đều</small></div>
+    </div>;
+  } else if (operation === "subtraction") {
+    scene = <div className="early-practice-pile is-subtraction">{renderObjects(first, Math.min(second, first))}<small>Có {first} {object.name}; lấy đi {second}</small></div>;
+  } else {
+    scene = <div className="early-practice-sets">
+      {[first, second].map((count, index) => <div className="early-practice-pile" key={`${count}-${index}`}>
+        {renderObjects(count)}<small>{index === 0 ? "Nhóm thứ nhất" : "Nhóm thứ hai"} · {count}</small>
+      </div>)}
+      <b aria-hidden="true">{operation === "addition" ? "+" : "↔"}</b>
+    </div>;
+  }
+
+  return <figure className={`early-practice-illustration is-${operation}`}>
+    <figcaption><span aria-hidden="true">🎨</span> Cùng hình dung câu chuyện</figcaption>
+    {scene}
+    <small className="early-practice-hint">Hình giúp em tưởng tượng số lượng — em hãy tự chọn cách tính nhé.</small>
+  </figure>;
+}
+
 export default function StudyArt({ grade = 1, className = "" }) {
   return <div className={`study-art study-art-grade-${grade} ${className}`}>{grade <= 2 ? <BunnyArt /> : <MathPicture grade={grade} caption={false} />}</div>;
 }

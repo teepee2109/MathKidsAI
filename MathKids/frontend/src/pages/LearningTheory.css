@@ -123,6 +123,43 @@
 .elementary-chart-scene > div > b { font-size: 17px; letter-spacing: 2px; }
 .elementary-chart-scene small { color: #71869b; font-size: 10px; font-weight: 900; }
 .elementary-chart-scene > strong { grid-column: 1 / -1; color: #258b5a; font-size: 14px; }
+.early-practice-illustration { display: grid; justify-items: center; gap: 10px; margin: 12px 0 15px; padding: 13px; border: 1px solid #d5e9f9; border-radius: 15px; background: linear-gradient(135deg, #f4fbff, #fffdf5); }
+.early-practice-illustration > figcaption { color: #3974ae; font-size: 12px; font-weight: 1000; }
+.early-practice-sets,.early-practice-sharing { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.early-practice-sets > b,.early-practice-sharing > b { color: #efa926; font-size: 24px; }
+.early-practice-shapes { display: grid; width: min(100%, 420px); grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.early-practice-shapes > span { display: grid; min-height: 76px; align-content: center; justify-items: center; gap: 3px; border: 1px solid #e7edf5; border-radius: 11px; background: #fff; }
+.early-practice-shapes b { font-size: 25px; }
+.early-practice-shapes small { color: #657c93; font-size: 9px; font-weight: 900; }
+.early-practice-position { display: flex; min-height: 75px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 9px; padding: 12px; border-radius: 12px; background: #fff; }
+.early-practice-position > * { color: #486b8d; font-size: 12px; font-weight: 900; }
+.early-practice-position > b { color: #e4a42c; font-size: 20px; }
+.early-practice-position > strong { color: #2c73ba; }
+.early-practice-position.is-vertical { flex-direction: column; gap: 3px; }
+.early-practice-clock-face { position: relative; width: 102px; height: 102px; border: 5px solid #73b9ed; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 4px #eaf6ff; }
+.early-practice-clock-face > i { position: absolute; top: 5px; left: calc(50% - 2px); width: 4px; height: 7px; border-radius: 3px; background: #8aa1b5; transform: rotate(calc(var(--clock-index) * 30deg)); transform-origin: 2px 42px; }
+.early-practice-clock-face .elementary-clock-hour,.early-practice-clock-face .elementary-clock-minute { position: absolute; bottom: 50%; left: calc(50% - 2px); width: 4px; border-radius: 4px; background: #31577f; transform-origin: center bottom; }
+.early-practice-clock-face .elementary-clock-hour { height: 26px; }
+.early-practice-clock-face .elementary-clock-minute { height: 35px; }
+.early-practice-clock-face::after { position: absolute; top: calc(50% - 4px); left: calc(50% - 4px); width: 8px; height: 8px; border-radius: 50%; background: #f0a935; content: ""; }
+.early-practice-measure-bars { display: grid; width: min(100%, 340px); gap: 7px; }
+.early-practice-measure-bars > div { display: grid; justify-items: start; gap: 3px; }
+.early-practice-measure-bars small { color: #657c93; font-size: 9px; font-weight: 900; }
+.early-practice-measure-bars > div > span { width: var(--measure-width); height: 12px; border: 1px solid #d7a83a; border-radius: 5px; background: repeating-linear-gradient(90deg, #ffe89b 0 17px, #d7a83a 17px 18px); }
+.early-practice-measure-bars i { display: flex; width: 100%; justify-content: space-between; color: #8596a7; font-size: 8px; font-style: normal; }
+.early-practice-measure-bars i b { font-weight: 700; }
+.early-practice-pile,.early-practice-basket,.early-practice-recipients { display: flex; min-width: 82px; min-height: 67px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 3px; padding: 8px; border: 1px solid #e5edf5; border-radius: 12px; background: #fff; }
+.early-practice-pile { max-width: 230px; }
+.early-practice-pile > span,.early-practice-basket > span { position: relative; font-size: 21px; line-height: 1.15; }
+.early-practice-pile > .early-practice-bundle { padding: 4px 7px; border-radius: 8px; background: #fff3c9; color: #7a5a14; font-size: 11px; font-weight: 1000; }
+.early-practice-pile > .early-practice-cross-note { flex-basis: 100%; color: #bf615c; font-size: 9px; font-weight: 900; text-align: center; }
+.early-practice-pile > span.is-crossed::after { position: absolute; inset: -2px 0 0; color: #e56b68; content: "╱"; font-size: 25px; font-weight: 1000; }
+.early-practice-pile > small,.early-practice-basket > small,.early-practice-recipients > small { flex-basis: 100%; color: #657c93; font-size: 9px; font-weight: 900; text-align: center; }
+.early-practice-array { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.early-practice-basket { min-width: 66px; min-height: 65px; gap: 2px; background: #fffef9; }
+.early-practice-recipients { max-width: 150px; }
+.early-practice-recipients > span { font-size: 23px; }
+.early-practice-hint { max-width: 520px; color: #71869b; font-size: 10px; line-height: 1.45; text-align: center; }
 #root .learning-young-intro { margin: 10px 0; color: #496987; font-size: 14px; font-weight: 800; line-height: 1.65; text-align: center; }
 .learning-young-rule { display: flex; align-items: flex-start; gap: 10px; margin-top: 11px; padding: 12px; border: 1px solid #f0dfa8; border-radius: 13px; background: #fffaf0; }
 .learning-young-rule > span { font-size: 23px; }
@@ -189,10 +226,18 @@
 .lesson-guide-why { border-color: #f0e3bb; background: #fffdf7; }
 .lesson-guide-activity { border-color: #dceee3; background: #fbfffc; }
 .lesson-guide-life { border-color: #e6def8; background: #fdfbff; }
+.lesson-guide-deep-dive { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; border: 1px solid #d5e5fa; border-radius: 13px; background: linear-gradient(120deg, #f0f7ff, #fbf9ff); }
+.lesson-guide-deep-dive h4 { grid-column: 1 / -1; margin: 0; color: #285784; font: 800 14px 'Baloo 2', cursive; }
+.lesson-guide-deep-dive > div { padding: 11px; border: 1px solid #e4edf7; border-radius: 10px; background: #fff; }
+.lesson-guide-deep-dive strong { color: #3c6893; font-size: 11px; }
+.lesson-guide-deep-dive p { margin: 5px 0 0; color: #5e7590; font-size: 11px; line-height: 1.65; }
 
 @media (max-width: 560px) {
   .lesson-guide-columns { grid-template-columns: 1fr; }
   .lesson-guide { padding: 13px; }
   .lesson-guide-heading h3 { font-size: 14px; }
   .lesson-guide-card { padding: 10px; }
+  .lesson-guide-deep-dive { grid-template-columns: 1fr; padding: 11px; }
+  .lesson-guide-deep-dive h4 { grid-column: 1; }
+  .early-practice-shapes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -228,6 +228,46 @@ export const supplementalQuestions = [
   q(5,"percentage","G5.PERCENT.RATIO","Trong 60 cây có 15 cây hoa. Tỉ số phần trăm số cây hoa so với tổng số cây là?",["15%","20%","25%","40%"],2,"Tỉ số phần trăm là 15 ÷ 60 × 100% = 25%.",1),
   q(5,"percentage","G5.PERCENT.RATIO","Có 18 học sinh hoàn thành bài trong tổng số 24 học sinh. Tỉ lệ hoàn thành là?",["60%","70%","75%","80%"],2,"Lấy số học sinh hoàn thành chia tổng số: 18 ÷ 24 = 0,75 = 75%.",2),
   q(5,"statistics","G5.PROBABILITY.EXPERIMENTAL","Vòng quay được quay 20 lần, kim vào ô xanh 7 lần. Tỉ số thực nghiệm của số lần vào ô xanh là?",["7/20","13/20","1/2","7/13"],0,"Xác suất thực nghiệm được mô tả bằng số lần sự kiện xảy ra chia tổng số lần thử: 7/20.",2),
+
+  // Everyday situations and reasoning prompts: keep the mathematics at the target grade.
+  // Grade 1: tell the story, compare quantities, and notice shape properties.
+  q(1,"addition","G1.ADD.MEANING","Na nhặt được 6 vỏ sò buổi sáng và 3 vỏ sò buổi chiều. Na có tất cả bao nhiêu vỏ sò?",["8 vỏ sò","9 vỏ sò","10 vỏ sò","3 vỏ sò"],1,"Hai nhóm vỏ sò được gộp lại: 6 + 3 = 9 vỏ sò." ,1),
+  q(1,"subtraction","G1.SUB.MEANING","Trên cành có 12 chiếc lá. Gió thổi bay 5 chiếc. Trên cành còn mấy chiếc lá?",["6 chiếc","7 chiếc","8 chiếc","17 chiếc"],1,"Lấy số lá ban đầu trừ số đã bay đi: 12 − 5 = 7 chiếc lá." ,1),
+  q(1,"geometry","G1.GEO.SHAPES","Tấm biển có 3 cạnh thẳng và 3 đỉnh. Tấm biển có dạng hình gì?",["Hình tròn","Hình tam giác","Hình chữ nhật","Hình vuông"],1,"Hình có 3 cạnh thẳng và 3 đỉnh là hình tam giác." ,1),
+  q(1,"measurement","G1.MEASURE.COMPARE_LENGTH","Dây đỏ dài 9 cm, dây xanh dài 6 cm. Dây đỏ dài hơn dây xanh bao nhiêu xăng-ti-mét?",["2 cm","3 cm","6 cm","15 cm"],1,"So sánh độ dài bằng phép trừ: 9 − 6 = 3 cm." ,1),
+  q(1,"time","G1.TIME.O_CLOCK","Buổi học bắt đầu lúc 8 giờ. Kim phút chỉ số 12, kim giờ chỉ số 8. Đồng hồ đang chỉ mấy giờ?",["6 giờ","8 giờ","12 giờ","20 giờ"],1,"Kim phút ở số 12 là giờ đúng; kim giờ ở số 8 nên đồng hồ chỉ 8 giờ." ,1),
+
+  // Grade 2: arrays, sharing, shopping and picture graphs.
+  q(2,"addition","G2.ADD_SUB.REGROUP","Lớp có 27 bút chì màu, cô giáo mang thêm 16 chiếc. Lớp có bao nhiêu bút chì màu?",["33 chiếc","42 chiếc","43 chiếc","53 chiếc"],2,"Cộng hai nhóm bút chì: 27 + 16 = 43 chiếc. Có thể cộng đơn vị rồi đổi đủ 10 đơn vị thành 1 chục." ,1),
+  q(2,"multiplication","G2.MULTIPLY.EQUAL_GROUPS","Trong phòng có 4 hàng ghế, mỗi hàng 5 chiếc. Phép tính nào tìm tổng số ghế?",["4 + 5 = 9","4 × 5 = 20","5 − 4 = 1","20 ÷ 4 = 4"],1,"Có 4 nhóm bằng nhau, mỗi nhóm 5 ghế nên dùng phép nhân 4 × 5 = 20." ,1),
+  q(2,"division","G2.DIVIDE.MEANING","Có 18 quả quýt chia đều vào 3 đĩa. Mỗi đĩa có bao nhiêu quả?",["5 quả","6 quả","9 quả","15 quả"],1,"Chia đều 18 quả thành 3 phần bằng nhau: 18 ÷ 3 = 6 quả mỗi đĩa." ,1),
+  q(2,"geometry","G2.GEO.BROKEN_LINE","Lối đi gồm 3 đoạn dài 4 m, 5 m và 3 m. Đường gấp khúc dài bao nhiêu mét?",["9 m","11 m","12 m","60 m"],2,"Độ dài đường gấp khúc bằng tổng các đoạn: 4 + 5 + 3 = 12 m." ,1),
+  q(2,"money","G2.MONEY.RECOGNIZE","Một quyển vở giá 6 000 đồng và cây bút giá 4 000 đồng. Mua cả hai món cần trả bao nhiêu?",["2 000 đồng","8 000 đồng","10 000 đồng","24 000 đồng"],2,"Cộng giá hai món: 6 000 + 4 000 = 10 000 đồng." ,1),
+  q(2,"statistics","G2.DATA.PICTURE_GRAPH","Trong biểu đồ tranh, mỗi ⭐ đại diện cho 2 bạn. Nếu đội Sao có 4 ngôi sao thì đội có bao nhiêu bạn?",["6 bạn","8 bạn","4 bạn","2 bạn"],1,"Mỗi biểu tượng là 2 bạn nên 4 biểu tượng đại diện 4 × 2 = 8 bạn." ,1),
+
+  // Grade 3: choose a model, spot the correct step, and interpret information.
+  q(3,"multiplication","G3.MULTIPLY.MULTI_DIGIT_BY_ONE","Một thư viện xếp 3 kệ sách, mỗi kệ có 126 quyển. Có tất cả bao nhiêu quyển sách?",["369 quyển","378 quyển","388 quyển","1 263 quyển"],1,"Tính 126 × 3 = (100 × 3) + (20 × 3) + (6 × 3) = 300 + 60 + 18 = 378 quyển." ,1),
+  q(3,"division","G3.DIVIDE.REMAINDER","Có 37 cây con, xếp đều vào 5 hàng. Mỗi hàng được 7 cây và còn dư mấy cây?",["1 cây","2 cây","3 cây","5 cây"],1,"5 × 7 = 35; lấy 37 − 35 = 2 cây còn dư. Số dư 2 nhỏ hơn số chia 5." ,1),
+  q(3,"fractions","G3.FRACTION.REPRESENT","Một chiếc bánh được cắt thành 8 miếng bằng nhau, em ăn 3 miếng. Phần bánh em đã ăn được viết là?",["3/8","8/3","5/8","3/5"],0,"Có 8 phần bằng nhau nên mẫu số là 8; đã ăn 3 phần nên tử số là 3: 3/8." ,1),
+  q(3,"expressions","G3.EXPRESSION.ORDER","Minh tính 24 + 12 ÷ 3 = 36 ÷ 3 = 12. Bước nào cần sửa trước?",["Cộng trước phép chia","Chia 12 cho 3 trước","Đổi phép chia thành phép nhân","Không cần sửa"],1,"Phép chia được thực hiện trước phép cộng: 12 ÷ 3 = 4, rồi 24 + 4 = 28." ,1),
+  q(3,"geometry","G3.GEO.PERIMETER_AREA","Một khu vườn hình chữ nhật dài 9 m, rộng 4 m. Cần bao nhiêu mét hàng rào để đi quanh vườn?",["13 m","26 m","36 m²","18 m"],1,"Hàng rào đi quanh đường bao nên cần chu vi: (9 + 4) × 2 = 26 m." ,1),
+  q(3,"statistics","G3.DATA.TABLE","Bảng ghi số sách mượn: thứ Hai 12 quyển, thứ Ba 15 quyển, thứ Tư 9 quyển. Ngày nào mượn nhiều nhất?",["Thứ Hai","Thứ Ba","Thứ Tư","Ba ngày bằng nhau"],1,"So sánh các số liệu 12, 15 và 9; số lớn nhất là 15 nên thứ Ba mượn nhiều nhất." ,1),
+
+  // Grade 4: practical measurement, averages, patterns and multi-step reasoning.
+  q(4,"fractions","G4.FRACTION.OPERATIONS","Mai dùng 1/4 lít sữa buổi sáng và 2/4 lít buổi chiều. Mai dùng tất cả bao nhiêu lít?",["3/8 lít","3/4 lít","2/4 lít","1 lít"],1,"Hai phân số cùng mẫu nên cộng tử số và giữ mẫu: 1/4 + 2/4 = 3/4 lít.",1),
+  q(4,"geometry","G4.GEO.PARALLELOGRAM_RHOMBUS","Một sân hình bình hành có đáy 12 m và chiều cao 5 m. Diện tích sân là bao nhiêu?",["17 m²","34 m²","60 m²","60 m"],2,"Diện tích hình bình hành bằng đáy nhân chiều cao: 12 × 5 = 60 m²." ,1),
+  q(4,"average","G4.WORDPROBLEM.AVERAGE","Nam đọc 6, 8 và 10 trang trong ba ngày. Trung bình mỗi ngày Nam đọc bao nhiêu trang?",["7 trang","8 trang","9 trang","24 trang"],1,"Tổng số trang là 6 + 8 + 10 = 24; chia đều cho 3 ngày: 24 ÷ 3 = 8 trang." ,1),
+  q(4,"sum-difference","G4.WORDPROBLEM.SUM_DIFFERENCE","Hai lớp quyên góp được 46 quyển sách. Lớp 4A góp nhiều hơn lớp 4B 8 quyển. Lớp 4A góp bao nhiêu quyển?",["19 quyển","23 quyển","27 quyển","38 quyển"],2,"Số lớn = (tổng + hiệu) ÷ 2 = (46 + 8) ÷ 2 = 27 quyển." ,1),
+  q(4,"sequences","G4.SEQUENCE.ARITHMETIC","Một hàng gạch được lát theo số viên: 4, 7, 10, 13, ... Nếu quy luật giữ nguyên, hàng tiếp theo có bao nhiêu viên?",["15 viên","16 viên","17 viên","18 viên"],1,"Mỗi số tăng thêm 3; kiểm tra các hiệu đều là 3, nên số tiếp theo là 13 + 3 = 16." ,1),
+  q(4,"statistics","G4.DATA.BAR_CHART","Biểu đồ cột cho biết lớp 4A đọc 28 sách, lớp 4B đọc 35 sách. Lớp nào đọc nhiều hơn và hơn bao nhiêu quyển?",["4A nhiều hơn 7 quyển","4B nhiều hơn 7 quyển","4B nhiều hơn 13 quyển","Hai lớp bằng nhau"],1,"35 > 28 nên lớp 4B đọc nhiều hơn; hiệu là 35 − 28 = 7 quyển." ,1),
+
+  // Grade 5: use mathematics to make decisions and explain a model.
+  q(5,"decimals","G5.DECIMAL.OPERATIONS","Lan mua 1,25 kg táo và 0,75 kg cam. Tổng khối lượng trái cây là bao nhiêu?",["1,50 kg","2 kg","2,10 kg","2,75 kg"],1,"Đặt thẳng hàng phần nguyên và phần thập phân: 1,25 + 0,75 = 2,00 kg." ,1),
+  q(5,"percentage","G5.PERCENT.VALUE","Một chiếc cặp giá 240 000 đồng được giảm 25%. Số tiền được giảm là bao nhiêu?",["40 000 đồng","50 000 đồng","60 000 đồng","80 000 đồng"],2,"25% = 1/4; tiền giảm là 240 000 ÷ 4 = 60 000 đồng." ,1),
+  q(5,"ratio","G5.WORDPROBLEM.SUM_RATIO","Nước chanh pha theo tỉ lệ nước : nước cốt = 4 : 1. Nếu dùng 20 cốc nước, cần bao nhiêu cốc nước cốt?",["4 cốc","5 cốc","16 cốc","25 cốc"],1,"4 phần nước ứng với 20 cốc nên một phần là 20 ÷ 4 = 5 cốc; nước cốt là 1 phần." ,1),
+  q(5,"motion","G5.MOTION.RELATION","Xe đạp đi đều 12 km trong 1 giờ. Nếu đi cùng tốc độ trong 3 giờ, xe đi được bao xa?",["15 km","24 km","36 km","4 km"],2,"Quãng đường = vận tốc × thời gian = 12 × 3 = 36 km." ,1),
+  q(5,"geometry-advanced","G5.GEO.SOLID_MEASURES","Hộp quà dài 6 cm, rộng 4 cm, cao 3 cm. Cần bao nhiêu khối lập phương 1 cm³ để lấp đầy hộp?",["13 khối","24 khối","72 khối","72 cm²"],2,"Thể tích hộp = dài × rộng × cao = 6 × 4 × 3 = 72 cm³, tức cần 72 khối đơn vị 1 cm³." ,1),
+  q(5,"statistics","G5.DATA.CHARTS","Biểu đồ ghi lượng giấy tái chế: tháng 1 là 18 kg, tháng 2 là 25 kg, tháng 3 là 21 kg. Hai tháng nào có tổng lượng lớn nhất?",["Tháng 1 và 2","Tháng 1 và 3","Tháng 2 và 3","Cả ba cặp bằng nhau"],2,"Tổng từng cặp: 18 + 25 = 43; 18 + 21 = 39; 25 + 21 = 46. Lớn nhất là tháng 2 và 3." ,1),
 ];
 
 export const supplementalQuestionMappings = supplementalQuestions.map((item) => ({

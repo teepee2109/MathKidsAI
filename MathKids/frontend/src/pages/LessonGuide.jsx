@@ -145,6 +145,105 @@ const lessonGuides = {
   }
 };
 
+const upperGradeTheory = {
+  addition: {
+    model: "Có thể tách số theo hàng hoặc nhóm các số hạng để tạo phép tính tròn chục, tròn trăm. Ta chỉ đổi cách nhóm chứ không đổi tổng.",
+    check: "Ước lượng kết quả trước; sau khi tính, cộng ngược hoặc so với ước lượng để phát hiện sai sót.",
+  },
+  subtraction: {
+    model: "Hiệu cho biết khoảng cách giữa hai số. Khi phép trừ khó, có thể đếm bù từ số bé đến số lớn; với số lớn, tách phần cần bớt theo hàng.",
+    check: "Lấy hiệu cộng số trừ. Nếu không trở lại số bị trừ ban đầu, hãy kiểm tra bước mượn hoặc phần nhớ.",
+  },
+  multiplication: {
+    model: "Phân tích một thừa số theo giá trị hàng rồi dùng tính chất phân phối: 23 × 4 = (20 × 4) + (3 × 4). Mỗi tích riêng giữ đúng hàng của nó.",
+    check: "Ước lượng bằng cách làm tròn một thừa số; kết quả đặt tính phải gần với tích ước lượng.",
+  },
+  division: {
+    model: "Phép chia tìm số nhóm hoặc số phần tử trong mỗi nhóm. Nếu có dư, phần dư phải nhỏ hơn số chia vì nếu không vẫn tách thêm được một nhóm.",
+    check: "Kiểm tra bằng: số chia × thương + số dư = số bị chia.",
+  },
+  geometry: {
+    model: "Chu vi đo đường bao quanh, còn diện tích đo phần mặt phẳng bên trong. Hai đại lượng không thể thay thế cho nhau dù cùng mô tả một hình.",
+    check: "Chu vi ghi đơn vị độ dài như cm; diện tích ghi đơn vị vuông như cm². Hãy nhìn đơn vị để tự phát hiện nhầm lẫn.",
+  },
+  "geometry-advanced": {
+    model: "Công thức diện tích xuất phát từ ghép, cắt hoặc biến đổi hình về hình chữ nhật. Chiều cao luôn là khoảng cách vuông góc với đáy đã chọn.",
+    check: "Diện tích dùng đơn vị vuông, thể tích dùng đơn vị khối. Thay ngược số đo vào công thức để kiểm tra.",
+  },
+  fractions: {
+    model: "Muốn cộng hoặc trừ phân số, trước tiên các phần phải cùng kích thước. Phân số tương đương giúp đổi cách viết mà vẫn giữ nguyên lượng.",
+    check: "Sau khi tính, rút gọn nếu được và tự hỏi kết quả có hợp lý so với một đơn vị nguyên không.",
+  },
+  measurement: {
+    model: "Đo và đổi đơn vị là so sánh cùng một đại lượng bằng các đơn vị khác nhau. Chỉ cộng hoặc trừ sau khi đổi các số đo về cùng đơn vị.",
+    check: "Viết quan hệ giữa hai đơn vị trước khi đổi; kiểm tra kết quả phải lớn hơn hay nhỏ hơn ban đầu theo hướng đổi.",
+  },
+  time: {
+    model: "Thời lượng là khoảng cách trên trục thời gian, không phải phép trừ hai cách viết giờ-phút như số thập phân. Một giờ có 60 phút.",
+    check: "Vẽ mốc bắt đầu và kết thúc; thử cộng thời lượng vào giờ bắt đầu để xem có về đúng giờ kết thúc không.",
+  },
+  "place-value": {
+    model: "Giá trị của chữ số bằng chữ số đó nhân với giá trị hàng. Mỗi hàng bên trái gấp 10 lần hàng liền bên phải; số 0 có thể giữ chỗ.",
+    check: "Tách số thành tổng các hàng rồi ghép lại. Cách đọc, cách viết và tổng giá trị hàng phải trùng nhau.",
+  },
+  "word-problems": {
+    model: "Bài toán lời văn cần một mô hình trước phép tính: sơ đồ đoạn thẳng, bảng, nhóm đồ vật hoặc dòng thời gian. Từ khóa đơn lẻ không đủ để quyết định phép tính.",
+    check: "Sau khi giải, dùng đáp số thay lại vào câu chuyện và trả lời đủ đại lượng cùng đơn vị mà đề hỏi.",
+  },
+  expressions: {
+    model: "Thứ tự phép tính là quy ước: ngoặc trước, nhân-chia trước cộng-trừ; các phép cùng mức được làm từ trái sang phải.",
+    check: "Ghi mỗi kết quả trung gian ở một dòng và giữ nguyên phần chưa tính để không bỏ sót dấu ngoặc.",
+  },
+  divisibility: {
+    model: "Dấu hiệu chia hết giúp suy luận từ cấu tạo chữ số: tổng chữ số liên hệ với chia hết cho 3 hoặc 9; chữ số cuối giúp xét chia hết cho 2 hoặc 5.",
+    check: "Thử dấu hiệu trên số mới, sau đó kiểm chứng bằng phép chia hoặc nhóm đồ vật; giải thích vì sao dấu hiệu áp dụng được.",
+  },
+  decimals: {
+    model: "Mỗi chữ số thập phân ứng với một hàng: phần mười, phần trăm, phần nghìn. Viết thêm số 0 ở cuối không làm thay đổi giá trị số.",
+    check: "Đặt dấu phẩy thẳng cột khi cộng trừ; ước lượng trước để nhận ra kết quả lệch hàng hoặc sai dấu phẩy.",
+  },
+  sequences: {
+    model: "Một quy luật phải giải thích được toàn bộ dãy. Với dãy cách đều, hiệu giữa mọi cặp số liên tiếp phải bằng nhau.",
+    check: "Tính nhiều hiệu liên tiếp, không kết luận chỉ từ hai số đầu; thay số dự đoán vào để kiểm tra quy luật.",
+  },
+  average: {
+    model: "Trung bình cộng là tổng được chia đều cho số lượng giá trị. Nếu thêm hoặc bớt một dữ liệu, tổng và số lượng cùng thay đổi.",
+    check: "Lấy trung bình nhân số lượng để khôi phục tổng; kết quả trung bình của một nhóm phải nằm trong khoảng từ giá trị nhỏ nhất đến lớn nhất.",
+  },
+  "sum-difference": {
+    model: "Hai số có tổng S và hiệu D. Bỏ phần chênh lệch D khỏi tổng rồi chia đôi sẽ được số bé; cộng D vào tổng rồi chia đôi sẽ được số lớn.",
+    check: "Kiểm tra đồng thời: số lớn + số bé = tổng và số lớn − số bé = hiệu.",
+  },
+  planting: {
+    model: "Cây nằm ở các điểm, còn khoảng cách là các đoạn nối. Trên đường thẳng có n khoảng và trồng ở cả hai đầu thì có n + 1 cây; vòng khép kín thì số điểm bằng số khoảng.",
+    check: "Vẽ vài trường hợp nhỏ như 1, 2, 3 khoảng và đếm điểm trước khi chọn công thức.",
+  },
+  ratio: {
+    model: "Tỉ số 2 : 3 nghĩa là hai lượng gồm 2 phần và 3 phần bằng nhau, không nhất thiết là 2 vật và 3 vật. Tổng số phần là 5.",
+    check: "Sau khi tìm hai lượng, rút gọn tỉ số của chúng và so lại với tỉ số đề bài.",
+  },
+  "difference-ratio": {
+    model: "Khi biết hiệu và tỉ số, phần chênh lệch trên sơ đồ bằng hiệu số phần, không phải tổng số phần. Từ đó tìm giá trị một phần.",
+    check: "Hai số tìm được phải vừa có đúng hiệu, vừa có đúng tỉ số; kiểm tra cả hai điều kiện.",
+  },
+  percentage: {
+    model: "Phần trăm luôn so sánh một phần với toàn bộ đang xét. 25% = 25/100 = 1/4, nhưng một phần tư của các tổng khác nhau sẽ cho kết quả khác nhau.",
+    check: "Ghi rõ toàn bộ là gì trước khi tính; tỉ lệ phần trăm của một phần không thể vượt 100% nếu phần đó nằm trong toàn bộ.",
+  },
+  units: {
+    model: "Độ dài là đại lượng một chiều, diện tích có hai chiều và thể tích có ba chiều. Vì vậy hệ số đổi lần lượt được nhân, bình phương hoặc lập phương.",
+    check: "Ghi số mũ trong đơn vị (m, m², m³) và kiểm tra hệ số đổi tương ứng trước khi dịch dấu phẩy.",
+  },
+  motion: {
+    model: "Ba đại lượng liên hệ bởi s = v × t. Công thức chỉ cho kết quả đúng khi đơn vị vận tốc và thời gian khớp nhau, chẳng hạn km/giờ với giờ.",
+    check: "Thay kết quả ngược vào công thức; quãng đường phải bằng vận tốc nhân thời gian và đơn vị phải đúng.",
+  },
+  statistics: {
+    model: "Bảng và biểu đồ là cách mã hóa dữ liệu. Tên, đơn vị, chú giải và thang chia cho biết mỗi cột hoặc biểu tượng đại diện cho điều gì.",
+    check: "Đọc chú giải và trục trước khi so sánh; nếu mỗi biểu tượng đại diện nhiều đơn vị, hãy nhân theo đúng chú giải.",
+  },
+};
+
 export default function LessonGuide({ grade, topic }) {
   const guide = lessonGuides[topic];
   if (!guide) return null;
@@ -156,5 +255,10 @@ export default function LessonGuide({ grade, topic }) {
       <article className="lesson-guide-card lesson-guide-activity"><span aria-hidden="true">👐</span><div><strong>Thử tự khám phá</strong><p>{grade <= 2 ? guide.early : guide.later}</p></div></article>
       <article className="lesson-guide-card lesson-guide-life"><span aria-hidden="true">🌱</span><div><strong>Toán quanh em</strong><p>{guide.daily}</p></div></article>
     </div>
+    {grade >= 3 && upperGradeTheory[topic] && <article className="lesson-guide-deep-dive">
+      <h4><span aria-hidden="true">📚</span> Mở rộng lý thuyết · lớp {grade}</h4>
+      <div><strong>🧠 Mô hình tư duy</strong><p>{upperGradeTheory[topic].model}</p></div>
+      <div><strong>🔎 Cách tự kiểm tra</strong><p>{upperGradeTheory[topic].check}</p></div>
+    </article>}
   </section>;
 }

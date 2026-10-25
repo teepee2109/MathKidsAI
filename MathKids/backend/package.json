@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "node --test masteryEngine.test.js",
+    "test": "node --test masteryEngine.test.js placementAssessment.test.js",
     "curriculum:validate": "node validate-curriculum-objectives.js",
     "postinstall": "prisma skills sync || exit 0"
   },

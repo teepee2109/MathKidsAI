@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
-import StudyArt, { ElementaryLessonVisual, MathPicture, StudyIcon } from "../components/StudyArt";
+import StudyArt, { EarlyPracticeIllustration, ElementaryLessonVisual, MathPicture, StudyIcon } from "../components/StudyArt";
 import { getQuestions, submitQuestionAnswer } from "../services/questions";
 import { completeLesson, getLearningPath } from "../services/learning";
 import LessonGuide from "./LessonGuide";
@@ -365,6 +365,7 @@ export default function LearningPath({ onLogout }) {
                   </section>}
                 </> : <>
                   <div className="learning-practice-progress">CÂU {practiceIndex + 1} / {practice.length}</div><p className="learning-practice-question">{currentQuestion.questionText}</p>
+                  {pathData.grade <= 2 && <EarlyPracticeIllustration topic={lesson.topic.code} questionText={currentQuestion.questionText} />}
                   <div className="learning-practice-options">{currentQuestion.options.map((option) => <button key={option.key} disabled={Boolean(answerResult) || answerSubmitting} className={answerResult ? option.key === answerResult.correctAnswer ? "is-correct" : "is-muted" : ""} onClick={() => answerQuestion(option.key)}><b>{option.key}</b>{option.text}</button>)}</div>
                   {answerSubmitting && <small className="learning-submitting" role="status">Đang kiểm tra đáp án…</small>}
                   {answerResult && <div className={`learning-answer-feedback ${answerResult.isCorrect ? "is-right" : "is-wrong"}`} role="status"><strong>{answerResult.isCorrect ? "Chính xác!" : "Chưa đúng — cùng xem vì sao nhé."}</strong><span>{answerFeedback}</span><button onClick={nextPracticeQuestion}>{practiceIndex + 1 === practice.length ? "Xem kết quả" : "Câu tiếp theo →"}</button></div>}

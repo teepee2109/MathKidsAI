@@ -10,6 +10,7 @@ import { authenticate, loginUser, loginWithFirebase, loginWithGoogle, registerUs
 import { sendPasswordResetOtpEmail, sendRegistrationOtpEmail } from "./emailService.js";
 import { syncCurriculumCatalog, syncSupplementalQuestionBank } from "./curriculumCatalog.js";
 import { applyPrerequisiteGates, evaluateLessonMastery, evaluateObjectiveEvidence, selectFocusObjective } from "./masteryEngine.js";
+import { buildPlacementQuestions, getPlacementSkills, PLACEMENT_QUESTION_COUNT } from "./placementAssessment.js";
 import bcrypt from "bcrypt";
 
 const app = express();
@@ -561,137 +562,83 @@ async function reconcileSePayInvoice(invoiceNumber) {
   if (!order || Number(order.order_amount) !== premiumPrice) return false;
   return activatePremiumOrder(invoiceNumber, order.order_id, "");
 }
-const assessmentSkills = [
-  { code: "ARITHMETIC_ADD_SUB", name: "Cộng và trừ", icon: "➕" },
-  { code: "ARITHMETIC_MUL_DIV", name: "Nhân và chia", icon: "✖️" },
-  { code: "GEOMETRY", name: "Hình học", icon: "📐" },
-  { code: "MEASUREMENT", name: "Đo lường", icon: "📏" },
-  { code: "WORD_PROBLEM", name: "Toán có lời văn", icon: "🧩" },
-];
 const placementTopicSkills = {
+  "number-sense": "ARITHMETIC_MUL_DIV",
+  "place-value": "ARITHMETIC_MUL_DIV",
   addition: "ARITHMETIC_ADD_SUB",
   subtraction: "ARITHMETIC_ADD_SUB",
   multiplication: "ARITHMETIC_MUL_DIV",
   division: "ARITHMETIC_MUL_DIV",
+  fractions: "ARITHMETIC_MUL_DIV",
   geometry: "GEOMETRY",
   "word-problems": "WORD_PROBLEM",
 };
+const placementTopicNames = {
+  "number-sense": "Tư duy số",
+  "place-value": "Cấu tạo số",
+  addition: "Phép cộng",
+  subtraction: "Phép trừ",
+  multiplication: "Phép nhân",
+  division: "Phép chia",
+  fractions: "Phân số",
+  geometry: "Hình học",
+  measurement: "Đo lường",
+  time: "Thời gian",
+  "word-problems": "Toán có lời văn",
+};
 function placementSkillForTopic(topicCode, grade) {
-  if (topicCode === "measurement" && Number(grade) >= 2) return "MEASUREMENT";
-  if (topicCode === "time" && Number(grade) <= 2) return "MEASUREMENT";
+  if (["measurement", "time"].includes(topicCode)) return "MEASUREMENT";
   return placementTopicSkills[topicCode] || null;
 }
 function masteredTopicsFromPlacement(summary, grade) {
-  const skillScores = new Map((Array.isArray(summary?.skillScores) ? summary.skillScores : [])
-    .map((skill) => [skill.code, Number(skill.score)]));
-  return Object.entries({
-    addition: placementSkillForTopic("addition", grade),
-    subtraction: placementSkillForTopic("subtraction", grade),
-    multiplication: placementSkillForTopic("multiplication", grade),
-    division: placementSkillForTopic("division", grade),
-    geometry: placementSkillForTopic("geometry", grade),
-    measurement: placementSkillForTopic("measurement", grade),
-    time: placementSkillForTopic("time", grade),
-    "word-problems": placementSkillForTopic("word-problems", grade),
-  }).flatMap(([topicCode, skillCode]) => skillCode && skillScores.get(skillCode) >= 80 ? [topicCode] : []);
-}
-const assessmentRandom = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-function buildAssessmentQuestions(grade) {
-  return assessmentSkills.flatMap((skill, skillIndex) => [0, 1].map((variant) => {
-    const level = Math.max(1, grade + variant - (skillIndex === 4 ? 1 : 0));
-    let prompt;
-    let answer;
-    let skillName = skill.name;
-    if (skillIndex === 0) {
-      const a = assessmentRandom(5 * level, 12 * level);
-      const b = assessmentRandom(2 * level, 8 * level);
-      const subtract = variant === 1;
-      prompt = subtract ? `${a + b} − ${b} = ?` : `${a} + ${b} = ?`;
-      answer = subtract ? a : a + b;
-    } else if (skillIndex === 1) {
-      const a = assessmentRandom(2, Math.min(12, grade + 5));
-      const b = assessmentRandom(2, Math.min(10, grade + 4));
-      if (grade === 1) {
-        skillName = "Tư duy số";
-        prompt = variant === 0 ? `${a} + ${b} = ?` : `${a + b} − ${a} = ?`;
-        answer = variant === 0 ? a + b : b;
-      } else {
-        prompt = variant === 0 ? `${a} × ${b} = ?` : `${a * b} ÷ ${a} = ?`;
-        answer = variant === 0 ? a * b : b;
-      }
-    } else if (skillIndex === 2) {
-      const side = assessmentRandom(2, 4 + grade * 2);
-      if (grade === 1) {
-        prompt = variant === 0 ? "Hình tam giác có mấy cạnh?" : "Hình vuông có mấy cạnh?";
-        answer = variant === 0 ? 3 : 4;
-      } else if (grade === 2) {
-        prompt = variant === 0 ? `Hình vuông cạnh ${side} cm có chu vi bao nhiêu cm?` : `Hình chữ nhật dài ${side + 3} cm, rộng ${side} cm. Chu vi là bao nhiêu cm?`;
-        answer = variant === 0 ? side * 4 : (side + 3 + side) * 2;
-      } else if (grade === 3) {
-        prompt = variant === 0 ? `Hình chữ nhật dài ${side + 3} cm, rộng ${side} cm. Chu vi là bao nhiêu cm?` : `Hình vuông cạnh ${side} cm có chu vi bao nhiêu cm?`;
-        answer = variant === 0 ? (side + 3 + side) * 2 : side * 4;
-      } else if (grade === 4) {
-        prompt = variant === 0 ? `Hình chữ nhật dài ${side + 3} cm, rộng ${side} cm. Diện tích là bao nhiêu cm²?` : `Hình vuông cạnh ${side} cm có diện tích bao nhiêu cm²?`;
-        answer = variant === 0 ? (side + 3) * side : side * side;
-      } else {
-        prompt = variant === 0 ? `Tam giác có đáy ${side * 2} cm, chiều cao ${side} cm. Diện tích là bao nhiêu cm²?` : `Hình chữ nhật dài ${side + 3} cm, rộng ${side} cm. Diện tích là bao nhiêu cm²?`;
-        answer = variant === 0 ? side * side : (side + 3) * side;
-      }
-    } else if (skillIndex === 3) {
-      const amount = assessmentRandom(2, 9) * 10;
-      if (grade === 1) {
-        prompt = variant === 0 ? "Một tuần có bao nhiêu ngày?" : "Một năm có bao nhiêu tháng?";
-        answer = variant === 0 ? 7 : 12;
-      } else if (grade === 2) {
-        prompt = variant === 0 ? "1 m bằng bao nhiêu cm?" : "1 giờ có bao nhiêu phút?";
-        answer = variant === 0 ? 100 : 60;
-      } else if (grade === 3) {
-        prompt = variant === 0 ? "1 kg bằng bao nhiêu g?" : "2 lít bằng bao nhiêu ml?";
-        answer = variant === 0 ? 1000 : 2000;
-      } else if (grade === 4) {
-        prompt = variant === 0 ? "1 m² bằng bao nhiêu cm²?" : `${amount} cm bằng bao nhiêu mm?`;
-        answer = variant === 0 ? 10000 : amount * 10;
-      } else {
-        prompt = variant === 0 ? "2,5 m bằng bao nhiêu cm?" : "3,2 kg bằng bao nhiêu g?";
-        answer = variant === 0 ? 250 : 3200;
-      }
-    } else {
-      const groups = assessmentRandom(2, 5 + grade);
-      const each = assessmentRandom(2, 5 + grade);
-      if (grade === 1) {
-        prompt = variant === 0 ? `Có ${groups} quả táo, mẹ cho thêm ${each} quả. Có tất cả bao nhiêu quả?` : `Có ${groups + each} quả bóng, cho bạn ${groups} quả. Còn lại bao nhiêu quả?`;
-        answer = variant === 0 ? groups + each : each;
-      } else {
-        prompt = variant === 0 ? `Có ${groups} túi, mỗi túi ${each} viên bi. Có tất cả bao nhiêu viên?` : `Có ${groups * each} chiếc bánh chia đều cho ${groups} bạn. Mỗi bạn được mấy chiếc?`;
-        answer = variant === 0 ? groups * each : each;
-      }
-    }
-    const correct = String(answer);
-    const choices = new Set([correct]);
-    while (choices.size < 4) choices.add(String(Math.max(0, answer + assessmentRandom(-Math.max(3, grade * 3), Math.max(3, grade * 3)) || answer + choices.size)));
-    return { skill: { ...skill, name: skillName }, prompt, answer: correct, options: [...choices].sort(() => Math.random() - 0.5) };
-  }));
+  const topicScores = new Map((Array.isArray(summary?.topicScores) ? summary.topicScores : [])
+    .map((topic) => [topic.code, topic]));
+  return [...topicScores.entries()].flatMap(([topicCode, topic]) => {
+    const isCurriculumTopic = placementSkillForTopic(topicCode, grade);
+    return isCurriculumTopic && Number(topic.total) >= 2 && Number(topic.score) >= 80 ? [topicCode] : [];
+  });
 }
 
-function fallbackLearningAdvice(skillScores, grade) {
+function fallbackLearningAdvice(skillScores, grade, topicScores = []) {
   const ordered = [...skillScores].sort((a, b) => a.score - b.score);
   const weak = ordered.filter((item) => item.score < 60);
   const strong = ordered.filter((item) => item.score >= 80);
-  const route = (weak.length ? weak : ordered.slice(0, 2)).map((item, index) => ({
-    day: index + 1, topicCode: item.code, title: `Ôn tập ${item.name.toLowerCase()}`,
-    activity: `Học lại kiến thức lớp ${grade}, làm 5 bài cơ bản rồi thử 3 câu vận dụng.`,
-  }));
+  const focusTopics = [...topicScores]
+    .filter((item) => Number(item.total) >= 2 && Number(item.score) < 80)
+    .sort((left, right) => left.score - right.score);
+  const detailedRoute = [];
+  const selectedTopicCodes = new Set();
+  for (const item of focusTopics) {
+    const topicCode = placementSkillForTopic(item.code, grade);
+    if (!topicCode || selectedTopicCodes.has(topicCode)) continue;
+    selectedTopicCodes.add(topicCode);
+    detailedRoute.push({
+      topicCode,
+      title: `Củng cố ${item.name.toLowerCase()}`,
+      activity: `Học lại kiến thức lớp ${grade} về ${item.name.toLowerCase()}, xem ví dụ rồi làm bài từ cơ bản đến vận dụng.`,
+    });
+    if (detailedRoute.length === 3) break;
+  }
+  const selectedSkills = weak.length ? weak : ordered.slice(0, 2);
+  const route = detailedRoute.length ? detailedRoute.map((item, index) => ({ day: index + 1, ...item }))
+    : selectedSkills.map((item, index) => ({
+      day: index + 1, topicCode: item.code, title: `Ôn tập ${item.name.toLowerCase()}`,
+      activity: `Học lại kiến thức lớp ${grade}, làm 5 bài cơ bản rồi thử 3 câu vận dụng.`,
+    }));
+  const focus = focusTopics.length ? focusTopics.slice(0, 4).map((item) => item.name)
+    : selectedSkills.map((item) => item.name);
   return {
-    summary: weak.length ? `Mình sẽ cùng con củng cố ${weak.map((item) => item.name.toLowerCase()).join(" và ")}. Học từng bước nhỏ sẽ giúp con tự tin hơn!` : "Con đã có nền tảng khá đồng đều. Hãy luyện thêm các dạng vận dụng để tiến bộ mỗi ngày!",
+    summary: focusTopics.length
+      ? `Mình sẽ cùng con xem kỹ hơn ${focusTopics.slice(0, 3).map((item) => item.name.toLowerCase()).join(", ")} qua bài học và ví dụ phù hợp lớp ${grade}.`
+      : weak.length ? `Mình sẽ cùng con củng cố ${weak.map((item) => item.name.toLowerCase()).join(" và ")}. Học từng bước nhỏ sẽ giúp con tự tin hơn!` : "Con đã có nền tảng khá đồng đều. Hãy luyện thêm các dạng vận dụng để tiến bộ mỗi ngày!",
     strengths: strong.map((item) => item.name),
-    focus: (weak.length ? weak : ordered.slice(0, 2)).map((item) => item.name),
+    focus,
     roadmap: route,
   };
 }
 
-async function createLearningAdvice(skillScores, grade) {
-  const fallback = fallbackLearningAdvice(skillScores, grade);
+async function createLearningAdvice(skillScores, grade, topicScores = []) {
+  const fallback = fallbackLearningAdvice(skillScores, grade, topicScores);
   if (process.env.GEMINI_API_ENABLED !== "true") {
     return { ...fallback, generatedBy: "System", fallbackReason: "provider_disabled" };
   }
@@ -707,8 +654,8 @@ async function createLearningAdvice(skillScores, grade) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: "Bạn là trợ lý giáo dục toán tiểu học Việt Nam. Chỉ dựa trên điểm kỹ năng, viết lời khích lệ ngắn, không gắn nhãn tiêu cực, đề xuất tối đa 3 bước HỌC VÀ LÀM BÀI TẬP trong mục Học tập; tuyệt đối không đề xuất trò chơi. topicCode phải là một trong các mã chính xác: ARITHMETIC_ADD_SUB, ARITHMETIC_MUL_DIV, GEOMETRY, MEASUREMENT, WORD_PROBLEM. Trả JSON với summary (string), strengths (array tên kỹ năng), focus (array tên kỹ năng), roadmap (array object gồm day, topicCode, title, activity). Hoạt động gồm đọc kiến thức, xem ví dụ và làm câu luyện tập phù hợp lớp; không chẩn đoán trẻ." }] },
-        contents: [{ role: "user", parts: [{ text: JSON.stringify({ grade, skillScores }) }] }],
+        systemInstruction: { parts: [{ text: "Bạn là trợ lý giáo dục toán tiểu học Việt Nam. Dựa trên điểm 5 mảng và các chủ đề nhỏ (mỗi chủ đề có số câu bằng chứng riêng), đề xuất hướng học thận trọng; không suy diễn từ nhóm chỉ có ít câu, không gắn nhãn tiêu cực. Viết lời khích lệ ngắn và tối đa 3 bước HỌC VÀ LÀM BÀI TẬP trong mục Học tập; tuyệt đối không đề xuất trò chơi. topicCode phải là một trong các mã chính xác: ARITHMETIC_ADD_SUB, ARITHMETIC_MUL_DIV, GEOMETRY, MEASUREMENT, WORD_PROBLEM. Trả JSON với summary (string), strengths (array tên kỹ năng), focus (array tên kỹ năng), roadmap (array object gồm day, topicCode, title, activity). Hoạt động gồm đọc kiến thức, xem ví dụ và làm câu luyện tập phù hợp lớp; không chẩn đoán trẻ." }] },
+        contents: [{ role: "user", parts: [{ text: JSON.stringify({ grade, skillScores, topicScores }) }] }],
         generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
       }),
       signal: AbortSignal.timeout(12000),
@@ -768,7 +715,7 @@ async function persistPlacementLearningPath(pool, studentId, attemptId, grade, s
   let roadmap = Array.isArray(advice.roadmap) ? advice.roadmap.slice(0, 3) : [];
   roadmap = roadmap.filter((item) => item && topicIds.has(item.topicCode) && item.title && item.activity);
   if (!roadmap.length) {
-    advice = { ...fallbackLearningAdvice(storedSummary.skillScores || [], grade), generatedBy: "System", fallbackReason: "provider_disabled" };
+    advice = { ...fallbackLearningAdvice(storedSummary.skillScores || [], grade, storedSummary.topicScores || []), generatedBy: "System", fallbackReason: "provider_disabled" };
     roadmap = advice.roadmap.filter((item) => topicIds.has(item.topicCode));
   }
 
@@ -1634,7 +1581,8 @@ app.post("/api/students/me/assessment/start", authenticate, async (request, resp
   try {
     const topicsResult = await pool.request().query("SELECT TopicId, TopicCode, TopicName FROM [mk].[Topic]");
     const topicMap = new Map(topicsResult.recordset.map((topic) => [topic.TopicCode, topic]));
-    if (assessmentSkills.some((skill) => !topicMap.has(skill.code))) return response.status(503).json({ message: "Thiếu dữ liệu chủ đề toán học. Hãy chạy script MathKidsDB.sql mới nhất." });
+    const skills = getPlacementSkills(gradeInput);
+    if (skills.some((skill) => !topicMap.has(skill.code))) return response.status(503).json({ message: "Thiếu dữ liệu chủ đề toán học. Hãy chạy script MathKidsDB.sql mới nhất." });
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const previousAttempt = await transaction.request()
       .input("studentId", sql.Int, request.user.userId)
@@ -1650,26 +1598,34 @@ app.post("/api/students/me/assessment/start", authenticate, async (request, resp
     const testResult = await transaction.request().input("grade", sql.TinyInt, gradeInput)
       .query("INSERT INTO [mk].[PlacementTest] (Title, Grade, IsActive) OUTPUT INSERTED.PlacementTestId VALUES (N'Đánh giá năng lực toán lớp ' + CAST(@grade AS NVARCHAR(1)), @grade, 1)");
     const testId = testResult.recordset[0].PlacementTestId;
-    const questions = buildAssessmentQuestions(gradeInput);
+    const questions = buildPlacementQuestions(gradeInput);
+    if (questions.length !== PLACEMENT_QUESTION_COUNT) throw new Error(`Placement assessment expected ${PLACEMENT_QUESTION_COUNT} questions, got ${questions.length}.`);
     const savedQuestions = [];
     for (const [index, question] of questions.entries()) {
       const topic = topicMap.get(question.skill.code);
       const result = await transaction.request()
         .input("topicId", sql.Int, topic.TopicId).input("grade", sql.TinyInt, gradeInput)
-        .input("difficulty", sql.TinyInt, Math.min(5, Math.max(1, gradeInput + (index % 2))))
+        .input("difficulty", sql.TinyInt, question.difficulty)
         .input("prompt", sql.NVarChar(sql.MAX), question.prompt)
-        .input("answer", sql.NVarChar(sql.MAX), JSON.stringify({ answer: question.answer }))
+        .input("answer", sql.NVarChar(sql.MAX), JSON.stringify({
+          answer: question.answer,
+          skillName: question.skill.name,
+          focusCode: question.focusCode,
+          focusName: question.focusName,
+          difficultyBand: question.difficultyBand,
+          difficultyName: question.difficultyName,
+        }))
         .input("options", sql.NVarChar(sql.MAX), JSON.stringify(question.options))
         .query("INSERT INTO [mk].[Question] (TopicId, Grade, Difficulty, QuestionType, Prompt, AnswerData, OptionsData) OUTPUT INSERTED.QuestionId VALUES (@topicId, @grade, @difficulty, 'MultipleChoice', @prompt, @answer, @options)");
       const questionId = result.recordset[0].QuestionId;
       await transaction.request().input("testId", sql.Int, testId).input("questionId", sql.Int, questionId).input("order", sql.SmallInt, index + 1)
         .query("INSERT INTO [mk].[PlacementTestQuestion] (PlacementTestId, QuestionId, QuestionOrder) VALUES (@testId, @questionId, @order)");
-      savedQuestions.push({ id: questionId, skillCode: question.skill.code, skillName: question.skill.name, prompt: question.prompt, options: question.options });
+      savedQuestions.push({ id: questionId, skillCode: question.skill.code, skillName: question.skill.name, focusName: question.focusName, difficultyName: question.difficultyName, prompt: question.prompt, options: question.options });
     }
     const attemptResult = await transaction.request().input("testId", sql.Int, testId).input("studentId", sql.Int, request.user.userId)
       .query("INSERT INTO [mk].[PlacementAttempt] (PlacementTestId, StudentId) OUTPUT INSERTED.AttemptId VALUES (@testId, @studentId)");
     await transaction.commit();
-    return response.status(201).json({ attemptId: attemptResult.recordset[0].AttemptId, grade: gradeInput, questions: savedQuestions });
+    return response.status(201).json({ attemptId: attemptResult.recordset[0].AttemptId, grade: gradeInput, questionCount: savedQuestions.length, questions: savedQuestions });
   } catch (error) {
     await transaction.rollback().catch(() => {});
     return response.status(500).json({ message: "Không thể bắt đầu bài đánh giá.", ...(process.env.NODE_ENV !== "production" ? { detail: error.message } : {}) });
@@ -1679,7 +1635,7 @@ app.post("/api/students/me/assessment/start", authenticate, async (request, resp
 app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (request, response) => {
   const attemptId = Number(request.params.attemptId);
   const answers = request.body?.answers;
-  if (!Number.isSafeInteger(attemptId) || attemptId < 1 || !Array.isArray(answers) || answers.length !== 10 || answers.some((item) => !item || !Number.isInteger(Number(item.questionId)) || typeof item.answer !== "string")) {
+  if (!Number.isSafeInteger(attemptId) || attemptId < 1 || !Array.isArray(answers) || !answers.length || answers.some((item) => !item || !Number.isInteger(Number(item.questionId)) || typeof item.answer !== "string")) {
     return response.status(400).json({ message: "Bài làm chưa đầy đủ hoặc không hợp lệ." });
   }
   let transaction;
@@ -1708,22 +1664,58 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
       });
     }
     const questionResult = await pool.request().input("testId", sql.Int, attempt.PlacementTestId)
-      .query("SELECT q.QuestionId, q.Prompt, q.AnswerData, t.TopicCode, t.TopicName FROM [mk].[PlacementTestQuestion] ptq JOIN [mk].[Question] q ON q.QuestionId = ptq.QuestionId JOIN [mk].[Topic] t ON t.TopicId = q.TopicId WHERE ptq.PlacementTestId = @testId");
+      .query("SELECT q.QuestionId, q.Prompt, q.AnswerData, q.Difficulty, t.TopicCode, t.TopicName FROM [mk].[PlacementTestQuestion] ptq JOIN [mk].[Question] q ON q.QuestionId = ptq.QuestionId JOIN [mk].[Topic] t ON t.TopicId = q.TopicId WHERE ptq.PlacementTestId = @testId ORDER BY ptq.QuestionOrder");
     const supplied = new Map(answers.map((item) => [Number(item.questionId), item.answer.trim()]));
-    if (supplied.size !== 10 || questionResult.recordset.length !== 10 || questionResult.recordset.some((question) => !supplied.has(question.QuestionId))) return response.status(400).json({ message: "Danh sách câu trả lời không khớp bài đánh giá." });
-    const skillMap = new Map(assessmentSkills.map((skill) => [skill.code, { ...skill, correct: 0, total: 0 }]));
+    if (supplied.size !== answers.length || supplied.size !== questionResult.recordset.length || questionResult.recordset.some((question) => !supplied.has(question.QuestionId))) return response.status(400).json({ message: "Danh sách câu trả lời không khớp bài đánh giá." });
+    const skillMap = new Map(getPlacementSkills(Number(attempt.Grade)).map((skill) => [skill.code, { ...skill, correct: 0, total: 0 }]));
+    const topicMap = new Map();
+    const difficultyMap = new Map([
+      ["foundation", { code: "foundation", name: "Khởi động", correct: 0, total: 0 }],
+      ["application", { code: "application", name: "Vận dụng", correct: 0, total: 0 }],
+      ["reasoning", { code: "reasoning", name: "Thử sức suy luận", correct: 0, total: 0 }],
+    ]);
     const markedAnswers = questionResult.recordset.map((question) => {
-      const isCorrect = supplied.get(question.QuestionId) === String(JSON.parse(question.AnswerData).answer);
+      let answerData = {};
+      try { answerData = JSON.parse(question.AnswerData || "{}"); } catch { answerData = {}; }
+      const isCorrect = supplied.get(question.QuestionId) === String(answerData.answer);
       const skill = skillMap.get(question.TopicCode);
+      if (!skill) throw new Error(`Assessment question ${question.QuestionId} uses an unknown skill code.`);
       skill.total += 1;
       if (isCorrect) skill.correct += 1;
-      return { questionId: question.QuestionId, answer: supplied.get(question.QuestionId), isCorrect, skillCode: question.TopicCode };
+      const focusCode = answerData.focusCode || question.TopicCode;
+      const topicScore = topicMap.get(focusCode) || {
+        code: focusCode,
+        name: placementTopicNames[focusCode] || answerData.focusName || question.TopicName,
+        correct: 0,
+        total: 0,
+      };
+      topicScore.total += 1;
+      if (isCorrect) topicScore.correct += 1;
+      topicMap.set(focusCode, topicScore);
+      const band = difficultyMap.get(answerData.difficultyBand);
+      if (band) {
+        band.total += 1;
+        if (isCorrect) band.correct += 1;
+      }
+      return {
+        questionId: question.QuestionId,
+        answer: supplied.get(question.QuestionId),
+        isCorrect,
+        skillCode: question.TopicCode,
+        focusCode,
+        focusName: answerData.focusName || question.TopicName,
+        difficultyBand: answerData.difficultyBand || null,
+      };
     });
-    const skillScores = [...skillMap.values()].map((skill) => ({ code: skill.code, name: attempt.Grade === 1 && skill.code === "ARITHMETIC_MUL_DIV" ? "Tư duy số" : skill.name, score: Math.round(skill.correct / skill.total * 100), correct: skill.correct, total: skill.total }));
-    const overallScore = Math.round(markedAnswers.filter((answer) => answer.isCorrect).length * 10);
+    const skillScores = [...skillMap.values()].map((skill) => ({ code: skill.code, name: skill.name, score: Math.round(skill.correct / skill.total * 100), correct: skill.correct, total: skill.total }));
+    const topicScores = [...topicMap.values()].map((topic) => ({ ...topic, score: Math.round(topic.correct / topic.total * 100) }));
+    const difficultyScores = [...difficultyMap.values()]
+      .filter((band) => band.total > 0)
+      .map((band) => ({ ...band, score: Math.round(band.correct / band.total * 100) }));
+    const overallScore = Math.round(markedAnswers.filter((answer) => answer.isCorrect).length / markedAnswers.length * 100);
     const isPremium = await hasActivePremium(pool, request.user.userId);
     const advice = isPremium
-      ? await createLearningAdvice(skillScores, attempt.Grade)
+      ? await createLearningAdvice(skillScores, attempt.Grade, topicScores)
       : { summary: "Đã lưu kết quả và bản đồ kỹ năng. Nâng cấp Premium để mở lộ trình học cá nhân hóa.", strengths: [], focus: [], roadmap: [], generatedBy: "System", premiumRequired: true };
     let earnedXp = 0;
     let earnedStars = 0;
@@ -1756,7 +1748,7 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
       earnedStars = overallScore >= 90 ? 2 : overallScore >= 70 ? 1 : 0;
     }
     const rewards = { xp: earnedXp, stars: earnedStars, alreadyClaimedToday: rewardAlreadyClaimed };
-    const summary = { overallScore, grade: attempt.Grade, skillScores, advice, rewards };
+    const summary = { overallScore, grade: attempt.Grade, questionCount: markedAnswers.length, skillScores, topicScores, difficultyScores, advice, rewards };
     const submitResult = await transaction.request()
       .input("attemptId", sql.BigInt, attemptId)
       .input("score", sql.Decimal(6, 2), overallScore)
@@ -1801,7 +1793,7 @@ app.post("/api/students/me/assessment/:attemptId/submit", authenticate, async (r
     const topicIds = new Map(topicRows.recordset.map((topic) => [topic.TopicCode, topic.TopicId]));
     const roadmap = Array.isArray(advice.roadmap) ? advice.roadmap.slice(0, 3) : [];
     let safeRoadmap = roadmap.filter((item) => item && topicIds.has(item.topicCode) && typeof item.title === "string" && typeof item.activity === "string");
-    if (!safeRoadmap.length) safeRoadmap = fallbackLearningAdvice(skillScores, attempt.Grade).roadmap;
+    if (!safeRoadmap.length) safeRoadmap = fallbackLearningAdvice(skillScores, attempt.Grade, topicScores).roadmap;
     const pathId = pathResult.recordset[0].LearningPathId;
     for (const [index, item] of safeRoadmap.entries()) {
       const plannedDate = new Date();
@@ -1845,7 +1837,7 @@ app.get("/api/students/me/assessment/latest", authenticate, async (request, resp
       const needsPremiumAdvice = advice.premiumRequired || !Array.isArray(advice.roadmap) || !advice.roadmap.length || (advice.generatedBy === "Fallback" && !advice.fallbackReason);
       if (needsPremiumAdvice && Array.isArray(resultData.skillScores) && resultData.skillScores.length) {
         const grade = Number(resultData.grade) || 1;
-        const refreshedAdvice = await createLearningAdvice(resultData.skillScores, grade);
+        const refreshedAdvice = await createLearningAdvice(resultData.skillScores, grade, resultData.topicScores || []);
         resultData.advice = await persistPlacementLearningPath(pool, request.user.userId, attempt.AttemptId, grade, storedSummary, refreshedAdvice);
       }
       resultData.isPremium = true;
@@ -2522,12 +2514,13 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
     try {
       placementSummary = JSON.parse(placementResult.recordset[0]?.AbilitySummary || "{}");
     } catch { placementSummary = {}; }
-    const placementScores = new Map((Array.isArray(placementSummary.skillScores) ? placementSummary.skillScores : [])
-      .map((skill) => [skill.code, Number(skill.score)]));
+    const placementScores = new Map((Array.isArray(placementSummary.topicScores) ? placementSummary.topicScores : [])
+      .map((topic) => [topic.code, topic]));
     for (const lesson of lessons) {
       lesson.weeklyAccuracy = weeklyTopicAccuracy.has(Number(lesson.topic.id)) ? weeklyTopicAccuracy.get(Number(lesson.topic.id)) : null;
-      const placementSkill = placementSkillForTopic(lesson.topic.code, studentGrade);
-      lesson.placementAccuracy = placementSkill ? placementScores.get(placementSkill) ?? null : null;
+      const topicCode = ["word_problem", "word-problem", "word-problems"].includes(lesson.topic.code) ? "word-problems" : lesson.topic.code;
+      const placementEvidence = placementScores.get(topicCode);
+      lesson.placementAccuracy = placementEvidence && Number(placementEvidence.total) >= 2 ? Number(placementEvidence.score) : null;
       const coreObjectives = lesson.learningObjectives.filter((objective) => objective.scope === "core");
       const hasCompleteObjectiveEvidence = coreObjectives.length > 0
         && coreObjectives.every((objective) => objective.progress?.canInformAdaptivePath);
@@ -2535,7 +2528,9 @@ app.get("/api/learning/path", authenticate, async (request, response) => {
       const objectiveCorrect = coreObjectives.reduce((sum, objective) => sum + (objective.progress?.correctCount || 0), 0);
       lesson.objectiveAccuracy = hasCompleteObjectiveEvidence && objectiveAttempts
         ? Math.round((objectiveCorrect / objectiveAttempts) * 100) : null;
-      const placementMastered = lesson.placementAccuracy !== null && lesson.placementAccuracy >= 80;
+      const placementMastered = lesson.placementAccuracy !== null
+        && Number(placementEvidence?.total) >= 2
+        && lesson.placementAccuracy >= 80;
       const objectiveMastered = isPremium && lesson.isObjectiveMastered;
       lesson.isMastered = !lesson.isCompleted && (objectiveMastered || placementMastered);
       lesson.masterySource = objectiveMastered ? "approved_objective_evidence"
